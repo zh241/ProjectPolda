@@ -26,9 +26,11 @@ def init_db():
     try:
         conn = mysql.connector.connect(
             host=os.getenv('DB_HOST', 'localhost'),
+            port=int(os.getenv('DB_PORT', 3306)),
             user=os.getenv('DB_USER', 'root'),
             password=os.getenv('DB_PASS', ''),
             database=os.getenv('DB_NAME', 'db_polda_kalsel'),
+            use_pure=True,
         )
         cursor = conn.cursor()
 
@@ -127,9 +129,11 @@ def login_required(f):
 def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv('DB_HOST', 'localhost'),
+        port=int(os.getenv('DB_PORT', 3306)),
         user=os.getenv('DB_USER', 'root'),
         password=os.getenv('DB_PASS', ''),
         database=os.getenv('DB_NAME', 'db_polda_kalsel'),
+        use_pure=True,
     )
 
 def get_tanggal_aktif():
