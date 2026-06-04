@@ -10,11 +10,14 @@ import psutil
 import socket
 from functools import wraps 
 
+from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 app = Flask(__name__)
 
@@ -38,7 +41,12 @@ def login_required(f):
     return decorated_function
 
 def get_db_connection():
-    return mysql.connector.connect(host="localhost", user="root", password="", database="db_polda_kalsel")
+    return mysql.connector.connect(
+        host=os.getenv('DB_HOST', 'localhost'),
+        user=os.getenv('DB_USER', 'root'),
+        password=os.getenv('DB_PASS', ''),
+        database=os.getenv('DB_NAME', 'db_polda_kalsel'),
+    )
 
 def get_tanggal_aktif():
     tanggal = request.args.get('tanggal')
