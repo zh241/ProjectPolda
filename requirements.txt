@@ -1,13 +1,13 @@
 Flask==3.0.0
 mysql-connector-python==8.2.0
-pandas==2.1.4
-psutil==5.9.6
+pandas==2.2.0
+psutil==5.9.8
 Werkzeug==3.0.1
 flask-wtf==1.2.1
 flask-limiter==3.5.0
 ultralytics==8.1.8
 opencv-python==4.8.1.78
-numpy==1.24.3
+numpy==1.26.4
 python-dotenv==1.0.0
 Pillow==10.1.0
 PyYAML==6.0.1

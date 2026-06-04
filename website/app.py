@@ -764,4 +764,5 @@ def toggle_theme():
 
 if __name__ == '__main__':
     debug_mode = os.getenv('FLASK_DEBUG', '0') == '1'
-    app.run(debug=debug_mode, port=5005)
+    port = int(os.getenv('PORT', 5005))
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
