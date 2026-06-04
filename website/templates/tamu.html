@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-2">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div class="mb-2 mb-md-0">
+            <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;">Manajemen Tamu (VMS)</h4>
+            <p class="text-primary small mb-0 fw-medium">
+                <i class="bi bi-person-vcard text-primary me-1"></i> Data kunjungan tamu Mako Polda Kalsel
+            </p>
+        </div>
+        <div>
+            <button class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#modalTambahTamu">
+                <i class="bi bi-person-plus-fill me-1"></i> Registrasi Tamu Baru
+            </button>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-header bg-white pt-4 pb-2 px-4 border-0 rounded-top-4">
+            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-record-circle text-danger animate-flicker me-2"></i> SEDANG DI DALAM MAKO (AKTIF)</h6>
+        </div>
+        <div class="card-body px-4 pb-4 pt-2">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 text-center" style="font-size: 0.85rem;">
+                    <thead class="bg-light text-muted border-bottom border-1">
+                        <tr>
+                            <th class="py-3">WAKTU MASUK</th>
+                            <th class="py-3">NAMA / INSTANSI</th>
+                            <th class="py-3">PLAT NOMOR</th>
+                            <th class="py-3">NO. BADGE</th>
+                            <th class="py-3">AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        {% for baris in tamu_aktif %}
+                        <tr style="border-bottom: 1px solid rgba(0,0,0,0.03);">
+                            <td class="fw-bold text-dark">{{ baris.waktu_datang.strftime('%H:%M:%S') }}</td>
+                            <td>
+                                <div class="fw-bold text-dark">{{ baris.nama_tamu }}</div>
+                                <div class="small text-muted">{{ baris.instansi }}</div>
+                            </td>
+                            <td><span class="fw-bold font-monospace bg-light border px-2 py-1 rounded text-dark">{{ baris.plat_nomor }}</span></td>
+                            <td><span class="badge bg-danger rounded-pill px-3">{{ baris.no_id_tamu }}</span></td>
+                            <td>
+                                <a href="{{ url_for('selesai_tamu', id_tamu=baris.id) }}" class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" onclick="return confirm('Tandai tamu ini selesai dan keluar dari Mako?');">
+                                    <i class="bi bi-check2-all me-1"></i> Selesai
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white pt-4 pb-2 px-4 border-0 rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <h6 class="fw-bold mb-3 mb-md-0 text-muted"><i class="bi bi-clock-history me-2"></i> RIWAYAT TAMU SELESAI</h6>
+            
+            <div class="d-flex align-items-center gap-2">
+                <form action="{{ url_for('tamu') }}" method="GET" class="d-flex align-items-center gap-2 m-0">
+                    <label class="small fw-bold text-muted d-none d-md-block mb-0">Lihat Tanggal:</label>
+                    <div class="input-group input-group-sm shadow-sm" style="width: auto;">
+                        <span class="input-group-text bg-dark text-white border-dark"><i class="bi bi-calendar3"></i></span>
+                        <input type="date" name="tanggal" class="form-control border-dark fw-bold" value="{{ tanggal_aktif }}" onchange="this.form.submit()" style="cursor: pointer;">
+                    </div>
+                </form>
+
+                {% if session.role == 'Super Admin' %}
+                <form action="{{ url_for('hapus_tamu_harian') }}" method="POST" class="m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="tanggal" value="{{ tanggal_aktif }}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold shadow-sm rounded-pill px-3" onclick="return confirm('PERINGATAN!\n\nSeluruh riwayat tamu yang sudah SELESAI pada tanggal {{ tanggal_aktif }} ini akan dihapus secara PERMANEN.\n\nLanjutkan penghapusan?')">
+                        <i class="bi bi-trash3-fill me-1"></i> Hapus Hari Ini
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body px-4 pb-4 pt-2">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 text-center" style="font-size: 0.85rem;">
+                    <thead class="bg-light text-muted border-bottom border-1">
+                        <tr>
+                            <th class="py-3">WAKTU MASUK</th>
+                            <th class="py-3">NAMA TAMU</th>
+                            <th class="py-3">PLAT NOMOR</th>
+                            <th class="py-3">TUJUAN</th>
+                            <th class="py-3">STATUS</th>
+                            {% if session.role == 'Super Admin' %}<th class="py-3 text-danger">AKSI</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        {% for baris in tamu_selesai %}
+                        <tr style="border-bottom: 1px solid rgba(0,0,0,0.03);">
+                            <td class="fw-bold text-muted">{{ baris.waktu_datang.strftime('%H:%M:%S') }}</td>
+                            <td class="fw-bold text-dark">{{ baris.nama_tamu }}</td>
+                            <td><span class="fw-bold font-monospace bg-light border px-2 py-1 rounded text-muted">{{ baris.plat_nomor }}</span></td>
+                            <td class="text-muted">{{ baris.tujuan }}</td>
+                            <td><span class="badge bg-secondary rounded-pill px-3"><i class="bi bi-door-closed me-1"></i> Telah Keluar</span></td>
+                            
+                            {% if session.role == 'Super Admin' %}
+                            <td>
+                                <a href="{{ url_for('hapus_tamu', id_tamu=baris.id) }}" class="btn btn-sm btn-outline-danger rounded-pill px-3 shadow-sm" onclick="return confirm('Hapus permanen riwayat tamu ini dari database?');">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalTambahTamu" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-primary text-white border-0 py-3 rounded-top-4">
+                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus-fill me-2"></i> Registrasi Tamu Baru</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('tambah_tamu') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-body p-4 bg-light">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Nama Lengkap (Sesuai KTP)</label>
+                        <input type="text" name="nama_tamu" class="form-control fw-bold border-0 shadow-sm" placeholder="Masukkan nama..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Plat Nomor (Pilih dari Gate Masuk)</label>
+                        <select name="plat_nomor" class="form-select fw-bold border-0 shadow-sm font-monospace">
+                            <option value="-" selected>-- Kendaraan Tidak Terdeteksi / Jalan Kaki --</option>
+                            {% for p in plat_masuk %}
+                            <option value="{{ p.plat_nomor }}">{{ p.plat_nomor }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Instansi / Asal</label>
+                        <input type="text" name="instansi" class="form-control fw-bold border-0 shadow-sm" placeholder="Contoh: PT. Maju Jaya / Sipil" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Tujuan Kunjungan</label>
+                        <textarea name="tujuan" class="form-control fw-bold border-0 shadow-sm" rows="2" placeholder="Contoh: Mengurus Berkas..." required></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small text-muted">No. ID Tamu (Badge Fisik)</label>
+                        <input type="text" name="no_id_tamu" class="form-control fw-bold border-0 shadow-sm text-danger" placeholder="Contoh: 05" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-white rounded-bottom-4 py-3 px-4 justify-content-between">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm"><i class="bi bi-save me-1"></i> Daftarkan Tamu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

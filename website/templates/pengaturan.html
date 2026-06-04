@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="mb-4">
+        <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;">Pengaturan Sistem</h4>
+        <p class="text-primary small mb-0 fw-medium">
+            <i class="bi bi-gear-fill text-primary me-1"></i> Konfigurasi Integrasi AI CCTV Utama
+        </p>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 h-100" style="border-top: 4px solid #198754;">
+                <div class="card-body p-4 p-md-5">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                            <i class="bi bi-camera-video-fill fs-4"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0 fs-5">Konfigurasi Jaringan CCTV</h6>
+                    </div>
+                    
+                    <form action="{{ url_for('pengaturan') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <div class="mb-5 bg-light p-4 rounded-4 border border-secondary border-opacity-10">
+                            <label class="fw-bold small text-muted mb-2 text-uppercase" style="letter-spacing: 1px;">
+                                <i class="bi bi-link-45deg me-1"></i> URL RTSP - KAMERA GERBANG UTAMA MAKO
+                            </label>
+                            
+                            <div class="input-group shadow-sm mb-2">
+                                <span class="input-group-text bg-dark text-white fw-bold border-dark px-4">CAM 1</span>
+                                <input type="password" id="rtspInput" name="rtsp_cam1" class="form-control form-control-lg fw-bold text-dark border-end-0" 
+                                       style="font-family: monospace; font-size: 0.95rem;"
+                                       value="{{ config.rtsp_cam1 if config else '' }}" 
+                                       placeholder="rtsp://admin:password@192.168.x.x:554/stream1">
+                                <button class="btn btn-outline-secondary bg-white border border-start-0" type="button" id="toggleRtsp" title="Lihat/Sembunyikan URL">
+                                    <i class="bi bi-eye-slash-fill text-muted" id="eyeIcon"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="d-flex align-items-start mt-3">
+                                <i class="bi bi-shield-lock-fill text-success me-2 mt-1"></i>
+                                <span class="form-text small fw-bold text-muted mb-0">
+                                    Masukkan URL RTSP / IP Camera resmi dari jaringan CCTV Gerbang Utama Polda Kalsel. <br>Sistem AI akan langsung membaca *stream* ini saat di-restart.
+                                </span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 fw-bold rounded-pill shadow-sm py-3 fs-6 transition-hover">
+                            <i class="bi bi-save-fill me-2"></i> SIMPAN KONEKSI KAMERA
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleBtn = document.getElementById('toggleRtsp');
+        const rtspInput = document.getElementById('rtspInput');
+        const eyeIcon = document.getElementById('eyeIcon');
+
+        if(toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                if (rtspInput.type === 'password') {
+                    rtspInput.type = 'text';
+                    eyeIcon.classList.remove('bi-eye-slash-fill');
+                    eyeIcon.classList.add('bi-eye-fill');
+                    eyeIcon.classList.replace('text-muted', 'text-primary');
+                } else {
+                    rtspInput.type = 'password';
+                    eyeIcon.classList.remove('bi-eye-fill');
+                    eyeIcon.classList.add('bi-eye-slash-fill');
+                    eyeIcon.classList.replace('text-primary', 'text-muted');
+                }
+            });
+        }
+    });
+</script>
+
+<style>
+    .transition-hover { transition: all 0.2s ease-in-out; }
+    .transition-hover:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(25, 135, 84, 0.3) !important; }
+    
+    /* Mengakali border input agar menyatu dengan tombol mata */
+    .form-control:focus {
+        border-color: #dee2e6;
+        box-shadow: none;
+    }
+    [data-bs-theme="dark"] .form-control:focus {
+        border-color: #495057;
+    }
+</style>
+{% endblock %}

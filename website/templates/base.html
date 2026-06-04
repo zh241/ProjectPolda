@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="id" data-bs-theme="{{ session.get('theme', 'light') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Gate - Polda Kalsel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+    <style>
+        :root {
+            --sidebar-bg: #0f1115;
+            --sidebar-active-bg: #1c2028;
+            --accent-red: #d32f2f;
+            --text-muted-sidebar: #8b92a5;
+            --top-nav-bg: #ffffff;
+            --sidebar-width: 240px;
+            --sidebar-collapsed-width: 72px;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            height: 100vh; background-color: var(--sidebar-bg); color: #ffffff;
+            position: fixed; width: var(--sidebar-width); z-index: 1001;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow-y: auto;
+            display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04);
+        }
+        .sidebar.collapsed { width: var(--sidebar-collapsed-width); }
+        .sidebar-header { padding: 18px 20px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); min-height: 80px; transition: 0.3s; }
+        .sidebar.collapsed .sidebar-header { justify-content: center; padding: 18px 0; }
+        .brand-logo { width: 40px; transition: 0.3s; flex-shrink: 0; }
+        .brand-text-container { margin-left: 12px; white-space: nowrap; transition: opacity 0.2s; }
+        .sidebar.collapsed .brand-text-container { display: none; opacity: 0; }
+
+        .nav-category { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted-sidebar); padding: 18px 22px 8px; font-weight: 700; white-space: nowrap; }
+        .sidebar.collapsed .nav-category { text-align: center; padding: 18px 0 8px; font-size: 0; }
+        .sidebar.collapsed .nav-category::after { content: '•••'; font-size: 0.9rem; }
+
+        .sidebar a { color: var(--text-muted-sidebar); text-decoration: none; padding: 11px 22px; display: flex; align-items: center; transition: 0.2s ease; font-size: 0.85rem; font-weight: 500; white-space: nowrap; border-left: 3px solid transparent; }
+        .sidebar.collapsed a { justify-content: center; padding: 13px 0; }
+        .sidebar a i { font-size: 1.15rem; margin-right: 13px; transition: 0.2s; color: var(--text-muted-sidebar); }
+        .sidebar.collapsed a i { margin-right: 0; font-size: 1.3rem; }
+        .sidebar.collapsed a span.menu-text { display: none; }
+        .sidebar a:hover { color: #ffffff; background-color: var(--sidebar-active-bg); border-left: 3px solid rgba(211,47,47,0.5); }
+        .sidebar a:hover i { color: rgba(255,255,255,0.85); }
+        .sidebar a.active { color: #ffffff; border-left: 3px solid var(--accent-red); background: linear-gradient(90deg, rgba(211, 47, 47, 0.12) 0%, transparent 100%); }
+        .sidebar a.active i { color: #ffffff; }
+
+        /* MAIN WRAPPER & TOP NAVBAR */
+        .main-wrapper { margin-left: var(--sidebar-width); min-height: 100vh; display: flex; flex-direction: column; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sidebar.collapsed + .main-wrapper { margin-left: var(--sidebar-collapsed-width); }
+        .top-navbar { background-color: var(--top-nav-bg); height: 80px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 0 rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 1000; }
+        .menu-toggle { background: none; border: none; color: #6c757d; font-size: 1.4rem; cursor: pointer; padding: 4px 8px; margin-right: 14px; transition: 0.2s; border-radius: 6px; }
+        .menu-toggle:hover { color: var(--accent-red); background: rgba(211,47,47,0.06); }
+        .time-box { font-family: 'Consolas', 'SF Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #495057; display: flex; align-items: center; padding: 0 16px; border-left: 1px solid #e9ecef; }
+        .live-dot { width: 7px; height: 7px; background-color: #28a745; border-radius: 50%; display: inline-block; margin-right: 7px; animation: pulse 2s infinite; }
+        
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(40,167,69,0.7); } 70% { box-shadow: 0 0 0 6px rgba(40,167,69,0); } 100% { box-shadow: 0 0 0 0 rgba(40,167,69,0); } }
+
+        .user-profile { display: flex; align-items: center; padding-left: 14px; padding-right: 8px; border-left: 1px solid #e9ecef; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .user-profile:hover { background: rgba(0,0,0,0.04); }
+        .user-avatar { width: 34px; height: 34px; background: #f1f3f5; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #6c757d; font-size: 1.1rem; border: 1px solid #e9ecef; }
+        .main-footer { background: transparent; padding: 16px 24px; margin-top: auto; font-size: 0.72rem; color: #adb5bd; }
+
+        /* DATATABLES */
+        .dataTables_wrapper .row:last-child { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; margin-top: 15px !important; }
+        .dataTables_wrapper .row:last-child > div { width: auto !important; flex: none !important; padding: 0 !important; }
+        .dataTables_wrapper .dataTables_info { padding-top: 0 !important; margin-bottom: 0 !important; }
+        .dataTables_wrapper .dataTables_paginate { margin-top: 0 !important; }
+        .dataTables_wrapper .pagination { margin: 0 !important; flex-wrap: nowrap !important; }
+
+        /* DARK MODE */
+        [data-bs-theme="dark"] body { background-color: #121416 !important; color: #e1e4e8 !important; }
+        [data-bs-theme="dark"] .top-navbar { background-color: #1c1f23 !important; border-bottom: 1px solid #2d3238 !important; }
+        [data-bs-theme="dark"] .card, [data-bs-theme="dark"] .bg-white, [data-bs-theme="dark"] .bg-light { background-color: #1c1f23 !important; border-color: #2d3238 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important; background-image: none !important; }
+        [data-bs-theme="dark"] .text-dark { color: #f8f9fa !important; }
+        [data-bs-theme="dark"] .text-muted { color: #adb5bd !important; }
+        [data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select, [data-bs-theme="dark"] .input-group-text { background-color: #2d3238 !important; color: #f8f9fa !important; border-color: #495057 !important; }
+        [data-bs-theme="dark"] .table { color: #e1e4e8 !important; }
+        [data-bs-theme="dark"] .table > :not(caption) > * > * { background-color: #1c1f23 !important; border-bottom-color: #2d3238 !important; color: #e1e4e8 !important; }
+        [data-bs-theme="dark"] .table-hover tbody tr:hover > * { background-color: #2d3238 !important; }
+        [data-bs-theme="dark"] .time-box, [data-bs-theme="dark"] .menu-toggle { color: #adb5bd; border-color: rgba(255,255,255,0.1); }
+        [data-bs-theme="dark"] .swal2-popup { background-color: #1c1f23 !important; color: #fff !important; }
+
+        /* CARDS */
+        .card { transition: transform 0.25s ease, box-shadow 0.25s ease !important; }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.07) !important; }
+        [data-bs-theme="dark"] .card:hover { box-shadow: 0 8px 20px rgba(211, 47, 47, 0.08) !important; }
+
+        .theme-btn { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #e9ecef; background: #f8f9fa; cursor: pointer; transition: 0.2s; }
+        .theme-btn:hover { background: #e9ecef; }
+        [data-bs-theme="dark"] .theme-btn { border-color: #495057; background: #2d3238; }
+        [data-bs-theme="dark"] .theme-btn:hover { background: #495057; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img src="{{ url_for('static', filename='logo_tik.png') }}" alt="TIK POLRI" class="brand-logo">
+            <div class="brand-text-container">
+                <h6 class="fw-bold mb-0 text-white" style="letter-spacing: 1.5px; font-size: 0.82rem;">DIGITAL GATE</h6>
+                <small style="font-size: 0.63rem; color: var(--accent-red); font-weight: 700; letter-spacing: 0.8px;">POLDA KALSEL</small>
+            </div>
+        </div>
+
+        <div class="nav-category">Dashboard & Analytics</div>
+        <a href="{{ url_for('index') }}" class="{% if halaman == 'dashboard' %}active{% endif %}" data-title="Dashboard Utama">
+            <i class="bi bi-speedometer2"></i> <span class="menu-text">Dashboard Monitoring</span>
+        </a>
+        <a href="{{ url_for('statistik') }}" class="{% if halaman == 'statistik' %}active{% endif %}" data-title="Statistik & Analitik">
+            <i class="bi bi-graph-up-arrow"></i> <span class="menu-text">Statistik & Analitik</span>
+        </a>
+
+        <div class="nav-category">Monitoring Real-Time</div>
+        <a href="{{ url_for('log_harian') }}" class="{% if halaman in ['log_semua', 'dinas', 'sipil'] %}active{% endif %}" data-title="Log Kendaraan">
+            <i class="bi bi-card-list"></i> <span class="menu-text">Log Kendaraan </span>
+        </a>
+        <a href="{{ url_for('live_stream') }}" class="{% if halaman == 'live_stream' %}active{% endif %}" data-title="Live Stream CCTV">
+            <i class="bi bi-camera-video"></i> <span class="menu-text">Live Stream CCTV</span>
+        </a>
+
+        <div class="nav-category">Security Center</div>
+        <a href="{{ url_for('tamu') }}" class="{% if halaman == 'tamu' %}active{% endif %}" data-title="Manajemen Tamu">
+            <i class="bi bi-person-vcard"></i> <span class="menu-text">Manajemen Tamu (VMS)</span>
+        </a>
+
+        <div class="nav-category">Administrasi & Sistem</div>
+        <a href="#" data-bs-toggle="modal" data-bs-target="#exportModal" data-title="Export Laporan">
+            <i class="bi bi-file-earmark-excel-fill text-success"></i> <span class="menu-text">Export Laporan (Excel)</span>
+        </a>
+
+        {% if session.role == 'Super Admin' %}
+        <a href="{{ url_for('arsip') }}" class="{% if halaman == 'arsip' %}active{% endif %}" data-title="Arsip & Maintenance">
+            <i class="bi bi-archive-fill"></i> <span class="menu-text">Arsip & Maintenance</span>
+        </a>
+        <a href="{{ url_for('users') }}" class="{% if halaman == 'users' %}active{% endif %}" data-title="User Management">
+            <i class="bi bi-person-gear"></i> <span class="menu-text">User Management</span>
+        </a>
+        <a href="{{ url_for('pengaturan') }}" class="{% if halaman == 'pengaturan' %}active{% endif %}" data-title="Pengaturan Sistem">
+            <i class="bi bi-gear-fill"></i> <span class="menu-text">Pengaturan Sistem</span>
+        </a>
+        {% endif %}
+
+        <div class="py-4"></div>
+    </div>
+
+    <div class="main-wrapper">
+        <nav class="top-navbar">
+            <div class="d-flex align-items-center">
+                <button class="menu-toggle" onclick="toggleSidebar()" title="Toggle Menu">
+                    <i class="bi bi-list"></i>
+                </button>
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark" style="font-size: 1rem; letter-spacing: 0.3px;">DIGITAL GATE MONITORING</h5>
+                    <div class="small text-muted" style="font-size: 0.68rem; font-weight: 500;">Mako Polda Kalimantan Selatan</div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                
+                <div class="d-none d-md-flex align-items-center px-3 py-1 rounded-pill" style="font-size: 0.72rem; font-weight: 700; background: #f8f9fa;">
+                    <span class="live-dot" id="global-ai-dot" style="background-color: #dc3545; animation: none;"></span>
+                    <span id="global-ai-text" style="color: #dc3545;">AI OFFLINE</span>
+                </div>
+
+                <div class="time-box d-none d-sm-flex"><span id="clock" style="font-size: 0.88rem;">00:00:00</span></div>
+
+                {% if session.loggedin %}
+                <form action="{{ url_for('toggle_theme') }}" method="POST" class="m-0 p-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="theme-btn" title="Ganti Mode Tampilan">
+                        {% if session.get('theme') == 'dark' %}
+                            <i class="bi bi-sun-fill text-warning fs-5"></i>
+                        {% else %}
+                            <i class="bi bi-moon-stars-fill text-dark fs-5"></i>
+                        {% endif %}
+                    </button>
+                </form>
+
+                <div class="d-flex align-items-center">
+                    <div class="user-profile ms-1" data-bs-toggle="modal" data-bs-target="#modalEditProfilGlobal" title="Edit Profil Saya">
+                        <div class="text-end me-2 d-none d-lg-block">
+                            <div class="fw-bold text-dark" style="font-size: 0.78rem; line-height: 1.3;">{{ session.nama_lengkap }}</div>
+                            <div style="font-size: 0.63rem; color: #adb5bd;">{{ session.role }} <i class="bi bi-caret-down-fill ms-1"></i></div>
+                        </div>
+                        <div class="user-avatar me-2"><i class="bi bi-person"></i></div>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="text-danger ms-2" title="Logout" onclick="return confirm('Logout dari sistem?');" style="font-size: 1.2rem;">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                </div>
+                {% endif %}
+                
+            </div>
+        </nav>
+
+        <div class="px-4 pt-4 pb-0">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else ('danger' if category == 'error' or category == 'danger' else 'warning') }} alert-dismissible fade show fw-bold border-0 shadow-sm rounded-3 d-flex align-items-center" role="alert">
+                    <i class="bi bi-info-circle-fill fs-5 me-3"></i> 
+                    <div>{{ message }}</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}{% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="p-4 pt-2">
+            {% block content %}{% endblock %}
+        </div>
+
+        <footer class="main-footer">
+            <div class="d-flex justify-content-between align-items-center px-1">
+                <span>© 2026 Polda Kalimantan Selatan</span>
+                <span>Digital Gate Monitoring System</span>
+            </div>
+        </footer>
+    </div>
+
+    <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+                <div class="modal-header bg-light border-0 py-3">
+                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-file-earmark-excel-fill text-success me-2"></i> Pusat Export Laporan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ url_for('export_data') }}" method="GET">
+                    <div class="modal-body p-4">
+                        <div class="mb-4 p-3 rounded-3 border border-primary border-opacity-25" style="background: rgba(13, 110, 253, 0.05);">
+                            <label class="form-label fw-bold text-primary small text-uppercase"><i class="bi bi-file-earmark-check me-1"></i> Pilih Jenis Laporan</label>
+                            <select name="tipe_laporan" class="form-select fw-bold border-primary shadow-sm" id="selectTipeLaporan">
+                                <option value="kendaraan">🚗 Log Kendaraan (Gerbang Utama)</option>
+                                <option value="tamu">👤 Buku Tamu (Visitor Management)</option>
+                            </select>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold small text-muted"><i class="bi bi-calendar-event me-1"></i> Dari Tanggal</label>
+                                <input type="date" name="tanggal_awal" class="form-control fw-bold border-secondary border-opacity-25" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold small text-muted"><i class="bi bi-calendar-check me-1"></i> Sampai Tanggal</label>
+                                <input type="date" name="tanggal_akhir" class="form-control fw-bold border-secondary border-opacity-25" required>
+                            </div>
+                        </div>
+                        <div id="filterTambahanKendaraan">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted"><i class="bi bi-tags me-1"></i> Kategori Kendaraan</label>
+                                <select name="kategori_export" class="form-select fw-bold border-secondary border-opacity-25">
+                                    <option value="Semua">Semua Kategori</option>
+                                    <option value="Polisi">Dinas / Polisi</option>
+                                    <option value="Umum">Sipil / Umum</option>
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label fw-bold small text-muted"><i class="bi bi-car-front me-1"></i> Jenis Kendaraan</label>
+                                <select name="jenis_export" class="form-select fw-bold border-secondary border-opacity-25">
+                                    <option value="Semua">Semua Jenis</option>
+                                    <option value="Mobil">Mobil (R4)</option>
+                                    <option value="Motor">Motor (R2)</option>
+                                    <option value="Truk">Kendaraan Besar (Truk/Bus)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-between">
+                        <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                            <i class="bi bi-download me-1"></i> Download (.xlsx)
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditProfilGlobal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-dark text-white rounded-top-4 py-3">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-person-lines-fill me-2"></i>Edit Informasi Akun Saya</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ url_for('edit_profil') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Nama Lengkap</label>
+                            <input type="text" name="nama_lengkap" class="form-control fw-bold" value="{{ session.nama_lengkap }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Username</label>
+                            <input type="text" name="username" class="form-control fw-bold" value="{{ session.username }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Password Baru (Kosongkan jika tidak diganti)</label>
+                            <input type="password" name="password_baru" class="form-control fw-bold" placeholder="Ketik sandi baru untuk mengganti...">
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pb-4 px-4 justify-content-between">
+                        <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">Simpan Pembaruan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Fungsi Penempel SweetAlert2 yang kebal DataTables
+        function attachSweetAlert() {
+            const confirmElements = document.querySelectorAll('[onclick*="return confirm"]');
+            confirmElements.forEach(el => {
+                if (el.dataset.swalAttached) return; // Mencegah tertempel dobel
+                el.dataset.swalAttached = 'true';
+                
+                const msgMatch = el.getAttribute('onclick').match(/confirm\('([^']+)'\)/);
+                const message = msgMatch ? msgMatch[1].replace(/\\n/g, '<br>') : "Apakah Anda yakin ingin melanjutkan?";
+                
+                // Hapus fungsi pop-up jadul bawaan browser
+                el.removeAttribute('onclick');
+
+                el.addEventListener('click', function(e) {
+                    e.preventDefault(); // Hentikan aksi klik bawaan
+                    
+                    const btnElement = this; 
+                    const parentForm = btnElement.closest('form'); 
+                    
+                    // Validasi form (Apakah input tanggal dsb sudah diisi?)
+                    if (parentForm && !parentForm.checkValidity()) {
+                        parentForm.reportValidity(); // Munculkan peringatan "Wajib Isi" dari browser
+                        return; // Berhenti, jangan munculkan SweetAlert
+                    }
+                    
+                    // Munculkan SweetAlert2
+                    Swal.fire({
+                        title: 'Konfirmasi Sistem',
+                        html: message,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#0d6efd',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: 'Ya, Lanjutkan!',
+                        cancelButtonText: 'Batal',
+                        reverseButtons: true,
+                        borderRadius: '15px'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // Eksekusi jika diklik "Ya"
+                            if (btnElement.tagName.toLowerCase() === 'a') {
+                                window.location.href = btnElement.href; // Untuk tombol Hapus Data & Selesai Tamu
+                            } else if (parentForm) {
+                                parentForm.submit(); // Untuk tombol Musnahkan Arsip & Pindah Arsip
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sembunyikan filter kategori/jenis jika memilih laporan Tamu
+            const selectLaporan = document.getElementById('selectTipeLaporan');
+            if(selectLaporan){
+                selectLaporan.addEventListener('change', function() {
+                    const filterKendaraan = document.getElementById('filterTambahanKendaraan');
+                    if (this.value === 'tamu') { filterKendaraan.style.display = 'none'; } 
+                    else { filterKendaraan.style.display = 'block'; }
+                });
+            }
+
+            // Jalankan SweetAlert pertama kali
+            attachSweetAlert();
+        });
+
+        // [PENTING] Jalankan ulang SweetAlert setiap kali DataTables pindah halaman/melakukan pencarian
+        $(document).on('draw.dt', function() {
+            attachSweetAlert();
+        });
+
+        // TOGGLE SIDEBAR
+        function toggleSidebar() {
+            document.getElementById("sidebar").classList.toggle("collapsed");
+            localStorage.setItem('sidebarState', document.getElementById("sidebar").classList.contains("collapsed"));
+        }
+        window.onload = function() {
+            if (localStorage.getItem('sidebarState') === 'true') {
+                document.getElementById("sidebar").classList.add("collapsed");
+            }
+        };
+
+        // CLOCK
+        function updateClock() {
+            const clockElement = document.getElementById('clock');
+            if (clockElement) {
+                const now = new Date();
+                clockElement.textContent = now.toLocaleTimeString('id-ID', { hour12: false });
+            }
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        // DATATABLES
+        $(document).ready(function() {
+            if (window.location.pathname !== '/') {
+                $('table').DataTable({
+                    "pageLength": 10,
+                    "lengthMenu": [10, 25, 50, 100],
+                    "ordering": false,
+                    "searching": false,
+                    "info": true,
+                    "autoWidth": false,
+                    "language": {
+                        "sEmptyTable":   "Tidak ada data yang tersedia pada tabel ini",
+                        "sProcessing":   "Sedang memproses...",
+                        "sLengthMenu":   "Tampilkan _MENU_ data",
+                        "sZeroRecords":  "Tidak ditemukan data yang sesuai",
+                        "sInfo":         "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+                        "sInfoEmpty":    "Menampilkan 0 sampai 0 dari 0 data",
+                        "sInfoFiltered": "(disaring dari _MAX_ data keseluruhan)",
+                        "sInfoPostFix":  "",
+                        "sSearch":       "Pencarian Cepat:",
+                        "sUrl":          "",
+                        "oPaginate": { "sFirst": "Pertama", "sPrevious": "Sebelumnya", "sNext": "Selanjutnya", "sLast": "Terakhir" }
+                    }
+                });
+            }
+        });
+
+        // GLOBAL AI HEALTH MONITOR
+        function updateHeaderAI() {
+            fetch('/api/system_health').then(r => r.json()).then(d => {
+                const dot = document.getElementById('global-ai-dot');
+                const txt = document.getElementById('global-ai-text');
+                if (d.ai_status === 'RUNNING') {
+                    if (dot) { dot.style.backgroundColor = '#198754'; dot.style.animation = 'pulse 2s infinite'; }
+                    if (txt) { txt.innerText = 'AI DETECTING'; txt.style.color = '#198754'; }
+                } else {
+                    if (dot) { dot.style.backgroundColor = '#dc3545'; dot.style.animation = 'none'; }
+                    if (txt) { txt.innerText = 'AI OFFLINE'; txt.style.color = '#dc3545'; }
+                }
+            }).catch(e => {
+                const dot = document.getElementById('global-ai-dot');
+                const txt = document.getElementById('global-ai-text');
+                if (dot) { dot.style.backgroundColor = '#dc3545'; dot.style.animation = 'none'; }
+                if (txt) { txt.innerText = 'AI OFFLINE'; txt.style.color = '#dc3545'; }
+            });
+        }
+        setInterval(updateHeaderAI, 3000); updateHeaderAI();
+    </script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-5">
+        <div>
+            <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;">Arsip & Maintenance</h4>
+            <p class="text-primary small mb-0 fw-medium">
+                <i class="bi bi-archive text-primary me-1"></i> Pemeliharaan database jangka panjang
+            </p>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <div class="bg-dark text-white fw-bold rounded-pill shadow-sm px-4 py-2 d-flex align-items-center" style="font-size: 0.85rem;">
+                <i class="bi bi-image me-2"></i> FOTO FISIK: {{ total_foto }} File
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-3" style="border-radius: 15px; border-top: 5px solid #0d6efd; background-color: #f8fbff;">
+                <div class="card-body text-center d-flex flex-column align-items-center">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                        <i class="bi bi-database-down fs-3"></i>
+                    </div>
+                    <h6 class="fw-bold text-primary text-uppercase small mb-2">1. Ekspor Data Rekaman</h6>
+                    <p class="text-muted small mb-4 flex-grow-1">Unduh seluruh isi tabel (Log, Tamu, Personil) ke dalam 1 file Excel multi-sheet sebagai cadangan data.</p>
+                    
+                    <a href="{{ url_for('backup_full') }}" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm mt-auto">
+                        <i class="bi bi-cloud-download me-1"></i> DOWNLOAD (.xlsx)
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-3" style="border-radius: 15px; border-top: 5px solid #fd7e14; background-color: #fff9f2;">
+                <div class="card-body text-center d-flex flex-column align-items-center">
+                    <div class="bg-warning bg-opacity-25 text-warning rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                        <i class="bi bi-archive-fill fs-3" style="color: #fd7e14;"></i>
+                    </div>
+                    <h6 class="fw-bold text-warning text-uppercase small mb-2" style="color: #fd7e14 !important;">2. Cold Storage Migration</h6>
+                    <p class="text-muted small mb-4 flex-grow-1">Pindahkan data log kendaraan lama ke tabel arsip agar aplikasi Live Feed tetap ringan.</p>
+                    
+                    <form action="{{ url_for('pindahkan_log') }}" method="POST" class="w-100 mt-auto text-start">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <select name="batas_hari" class="form-select form-select-sm mb-3 fw-bold bg-white shadow-sm border-secondary border-opacity-25 text-center">
+                            <option value="30">Log Lebih dari 30 Hari</option>
+                            <option value="60">Log Lebih dari 60 Hari</option>
+                            <option value="90">Log Lebih dari 90 Hari</option>
+                        </select>
+                        <div class="form-check form-check-inline small fw-bold mb-3 d-flex justify-content-center w-100">
+                            <input class="form-check-input me-2" type="checkbox" name="setuju_hapus_foto" id="checkFoto" checked>
+                            <label class="form-check-label text-dark" for="checkFoto">Hapus Fisik Foto Juga</label>
+                        </div>
+                        <button type="submit" class="btn btn-warning text-dark w-100 rounded-pill fw-bold shadow-sm" onclick="return confirm('Proses ini akan memindahkan data log utama ke dalam tabel Arsip.\n\nLanjutkan?')">
+                            EKSEKUSI PINDAH
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-3" style="border-radius: 15px; border-top: 5px solid #20c997; background-color: #f4fdfa;">
+                <div class="card-body text-center d-flex flex-column align-items-center">
+                    <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                        <i class="bi bi-images fs-3" style="color: #20c997;"></i>
+                    </div>
+                    <h6 class="fw-bold text-success text-uppercase small mb-2" style="color: #20c997 !important;">3. Pembersihan Foto Fisik</h6>
+                    <p class="text-muted small mb-4 flex-grow-1">Bersihkan file foto lama di folder server untuk menghemat kapasitas penyimpanan.</p>
+                    
+                    <div class="w-100 mt-auto text-start">
+                        <form action="{{ url_for('clean_foto_manual') }}" method="POST" class="mb-3 border-bottom pb-3 border-success border-opacity-25">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <label class="small fw-bold text-dark mb-1">A. Hapus Manual Sekarang:</label>
+                            <div class="input-group input-group-sm shadow-sm">
+                                <select name="hari_foto" class="form-select bg-white fw-bold text-center" required>
+                                    <option value="" disabled selected>Pilih Usia Foto...</option>
+                                    <option value="1">> 1 Hari Berlalu</option>
+                                    <option value="3">> 3 Hari Berlalu</option>
+                                    <option value="7">> 7 Hari Berlalu</option>
+                                    <option value="14">> 14 Hari Berlalu</option>
+                                    <option value="30">> 30 Hari Berlalu</option>
+                                </select>
+                                <button class="btn btn-success fw-bold" style="background-color: #20c997; border-color: #20c997;" type="submit" onclick="return confirm('Peringatan: File foto fisik yang dipilih akan dihapus permanen dari server.\n\nLanjutkan?')">HAPUS</button>
+                            </div>
+                        </form>
+
+                        <form action="{{ url_for('set_auto_policy') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <label class="small fw-bold text-dark mb-1">B. Sistem Hapus Otomatis:</label>
+                            <div class="input-group input-group-sm shadow-sm">
+                                <select name="hari_auto" class="form-select bg-white fw-bold small text-center">
+                                    <option value="off" {% if session.get('auto_policy_hari', 'off') == 'off' %}selected{% endif %}>🔴 OFF (Mati)</option>
+                                    <option value="1" {% if session.get('auto_policy_hari') == '1' %}selected{% endif %}>🟢 Auto > 1 Hari</option>
+                                    <option value="3" {% if session.get('auto_policy_hari') == '3' %}selected{% endif %}>🟢 Auto > 3 Hari</option>
+                                    <option value="7" {% if session.get('auto_policy_hari') == '7' %}selected{% endif %}>🟢 Auto > 7 Hari</option>
+                                    <option value="14" {% if session.get('auto_policy_hari') == '14' %}selected{% endif %}>🟢 Auto > 14 Hari</option>
+                                    <option value="30" {% if session.get('auto_policy_hari') == '30' %}selected{% endif %}>🟢 Auto > 30 Hari</option>
+                                </select>
+                                <button class="btn btn-dark fw-bold" type="submit">SET</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-5 mb-5" style="border-radius: 15px; overflow: hidden; border-top: 4px solid #343a40;">
+        <div class="card-header bg-white p-4 border-0">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+                <div>
+                    <h5 class="fw-bold mb-1 text-dark"><i class="bi bi-box-seam-fill text-secondary me-2"></i> Gudang Arsip Digital</h5>
+                    <p class="small text-muted mb-0">Catatan riwayat historis (Data Teks Only).</p>
+                </div>
+                <span class="badge bg-secondary px-3 py-2 rounded-pill shadow-sm mt-2 mt-md-0 fs-6">{{ data_arsip|length }} Rekaman Tersimpan</span>
+            </div>
+
+            <div class="bg-secondary bg-opacity-10 p-4 rounded-4 border border-secondary border-opacity-25 mt-2">
+                <div class="row align-items-center justify-content-between g-3">
+                    
+                    <div class="col-lg-8 border-lg-end border-secondary border-opacity-25">
+                        <form action="{{ url_for('hapus_arsip_massal') }}" method="POST" class="d-flex flex-wrap align-items-center gap-3 m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <span class="fw-bold small text-dark"><i class="bi bi-calendar-x me-1"></i> Hapus Rentang:</span>
+                            
+                            <div class="input-group input-group-sm shadow-sm" style="width: auto;">
+                                <span class="input-group-text bg-white fw-bold text-muted border-end-0">Dari</span>
+                                <input type="date" name="tgl_awal" class="form-control border-start-0 fw-bold text-dark" required>
+                            </div>
+                            
+                            <div class="input-group input-group-sm shadow-sm" style="width: auto;">
+                                <span class="input-group-text bg-white fw-bold text-muted border-end-0">Sampai</span>
+                                <input type="date" name="tgl_akhir" class="form-control border-start-0 fw-bold text-dark" required>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-sm btn-dark fw-bold px-4 shadow-sm" onclick="return confirm('PERINGATAN!\n\nData arsip pada rentang tanggal ini akan dimusnahkan secara PERMANEN.\n\nLanjutkan pemusnahan?')">
+                                Musnahkan Rentang
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                        <form action="{{ url_for('hapus_semua_arsip') }}" method="POST" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-danger fw-bold px-4 shadow-sm w-100 w-lg-auto py-2" onclick="return confirm('BAHAYA! TINDAKAN DESTRUKTIF!\n\nAnda akan menghapus SELURUH DATA yang ada di Gudang Arsip tanpa tersisa satu pun.\n\nTindakan ini TIDAK DAPAT DIBATALKAN. Anda sangat yakin?')">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> KOSONGKAN GUDANG
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center">
+                    <thead class="bg-light small text-uppercase fw-bold text-muted border-top border-bottom border-2">
+                        <tr>
+                            <th class="py-3">Waktu Terekam</th>
+                            <th class="py-3">Jenis Kendaraan</th>
+                            <th class="py-3">Plat Nomor</th>
+                            <th class="py-3">Kategori</th>
+                            <th class="py-3 text-danger">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        {% for baris in data_arsip %}
+                        <tr class="border-bottom border-secondary border-opacity-10">
+                            <td class="small fw-bold text-dark">{{ baris.waktu }}</td>
+                            <td>
+                                <div class="d-flex align-items-center justify-content-center">
+                                    {% if baris.jenis_kendaraan == 'Mobil' %}
+                                        <i class="bi bi-car-front-fill text-muted fs-5 me-2"></i>
+                                    {% elif baris.jenis_kendaraan == 'Motor' %}
+                                        <i class="bi bi-bicycle text-muted fs-5 me-2"></i>
+                                    {% else %}
+                                        <i class="bi bi-truck text-muted fs-5 me-2"></i>
+                                    {% endif %}
+                                    <span class="fw-bold text-muted small text-uppercase">{{ baris.jenis_kendaraan }}</span>
+                                </div>
+                            </td>
+                            <td><span class="badge bg-light border border-secondary border-opacity-25 px-4 py-2 fs-6 shadow-sm font-monospace text-dark rounded-pill">{{ baris.plat_nomor }}</span></td>
+                            <td>
+                                {% if baris.kategori == 'Polisi' %}
+                                    <span class="text-success fw-bold small"><i class="bi bi-shield-fill-check me-1"></i> POLISI</span>
+                                {% else %}
+                                    <span class="text-muted fw-bold small">SIPIL</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if baris.id %}
+                                <a href="{{ url_for('hapus_arsip_satuan', id_arsip=baris.id) }}" class="btn btn-sm btn-outline-danger rounded-pill shadow-sm px-3" onclick="return confirm('Hapus permanen satu data arsip ini?');">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

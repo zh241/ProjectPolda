@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-2">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;">Live Stream CCTV</h4>
+            <p class="text-primary small mb-0 fw-medium">
+                <i class="bi bi-camera-video text-primary me-1"></i> Pantauan Real-Time Gerbang Utama Mako
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('log_harian') }}" class="btn btn-dark fw-bold rounded-pill shadow-sm px-4 py-2">
+                <i class="bi bi-card-list me-1"></i> Lihat Log Masuk
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="background-color: #0f1115;">
+                
+                <div class="card-header bg-dark text-white p-3 border-0 d-flex justify-content-between align-items-center" style="border-bottom: 1px solid rgba(255,255,255,0.1) !important;">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-camera-reels-fill text-secondary fs-5 me-3"></i>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-uppercase" style="letter-spacing: 1px;">CAM 1 - MAIN GATE (IN)</h6>
+                            <small class="text-muted" style="font-size: 0.7rem;">AI Detection Engine Powered by YOLO</small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill fw-bold" style="letter-spacing: 1px; font-size: 0.7rem;">
+                            <i class="bi bi-record-circle-fill animate-flicker me-1"></i> PORT 5050 ACTIVE
+                        </span>
+                        <button class="btn btn-sm btn-outline-secondary ms-1 text-white border-0" onclick="toggleFullScreen()" title="Layar Penuh">
+                            <i class="bi bi-arrows-fullscreen"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-body p-0 position-relative d-flex align-items-center justify-content-center" style="min-height: 50vh; background-color: #000; overflow: hidden;">
+                    
+                    <img id="cctv-stream" 
+                         src="http://127.0.0.1:5050/video_feed" 
+                         class="img-fluid w-100 h-100" 
+                         style="object-fit: cover;"
+                         alt="Mencoba terhubung ke Kamera AI..."
+                         onerror="kameraMati()">
+
+                    <div id="kamera-error" class="position-absolute top-50 start-50 translate-middle text-center w-100 d-none">
+                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 4rem;"></i>
+                        <h5 class="text-white fw-bold mt-3">Sinyal Kamera Terputus</h5>
+                        <p class="text-muted small">Pastikan file <code>deteksi.py</code> sedang berjalan dan menggunakan Port 5050.</p>
+                        <button class="btn btn-outline-light btn-sm rounded-pill px-4 mt-2 fw-bold" onclick="window.location.reload()">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh Sinyal
+                        </button>
+                    </div>
+
+                    <div class="position-absolute bottom-0 start-0 p-3 w-100 d-flex justify-content-between" style="background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); pointer-events: none;">
+                        <span class="text-white fw-bold font-monospace" style="font-size: 0.85rem;" id="live-jam">00:00:00</span>
+                        <span class="text-success fw-bold font-monospace" style="font-size: 0.85rem;"><i class="bi bi-cpu me-1"></i>AI ANALYZING</span>
+                    </div>
+
+                </div>
+
+                <div class="card-footer bg-dark border-0 py-2 px-4 text-center">
+                    <span class="text-muted" style="font-size: 0.65rem; font-family: monospace; letter-spacing: 2px;">SECURE VIDEO TRANSMISSION • ENCRYPTED LOCALHOST TNNL</span>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fungsi jika gambar CCTV gagal dimuat dari deteksi.py
+    function kameraMati() {
+        document.getElementById('cctv-stream').style.display = 'none';
+        document.getElementById('kamera-error').classList.remove('d-none');
+    }
+
+    // Fungsi Full Screen
+    function toggleFullScreen() {
+        var elem = document.getElementById("cctv-stream");
+        if (!document.fullscreenElement) {
+            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+            else if (elem.webkitRequestFullscreen) { /* Safari */ elem.webkitRequestFullscreen(); } 
+            else if (elem.msRequestFullscreen) { /* IE11 */ elem.msRequestFullscreen(); }
+        } else {
+            if (document.exitFullscreen) { document.exitFullscreen(); }
+        }
+    }
+
+    // Update Jam Live di sudut video
+    function updateJamVideo() {
+        const d = new Date();
+        document.getElementById('live-jam').textContent = d.toLocaleDateString('id-ID') + ' ' + d.toLocaleTimeString('id-ID', { hour12: false });
+    }
+    setInterval(updateJamVideo, 1000); updateJamVideo();
+</script>
+
+<style>
+    /* Efek kedap-kedip untuk tombol LIVE */
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+    .animate-flicker { animation: blink 1.5s infinite; }
+</style>
+{% endblock %}
