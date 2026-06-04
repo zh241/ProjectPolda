@@ -40,7 +40,21 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+from urllib.parse import urlparse
+
+
 def get_db_connection():
+    db_url = os.getenv('DB_HOST') or os.getenv('DATABASE_URL') or os.getenv('MYSQL_URL')
+    if db_url and db_url.startswith('mysql://'):
+        parsed = urlparse(db_url)
+        return mysql.connector.connect(
+            host=parsed.hostname,
+            port=parsed.port or 3306,
+            user=parsed.username,
+            password=parsed.password,
+            database=parsed.path.lstrip('/'),
+        )
+
     return mysql.connector.connect(
         host=os.getenv('DB_HOST', 'localhost'),
         user=os.getenv('DB_USER', 'root'),
