@@ -55,12 +55,25 @@ def get_db_connection():
             database=parsed.path.lstrip('/'),
         )
 
-    return mysql.connector.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        user=os.getenv('DB_USER', 'root'),
-        password=os.getenv('DB_PASS', ''),
-        database=os.getenv('DB_NAME', 'db_polda_kalsel'),
-    )
+    # Support DB_PORT environment variable for explicit port setting
+    db_host = os.getenv('DB_HOST', 'localhost')
+    db_user = os.getenv('DB_USER', 'root')
+    db_pass = os.getenv('DB_PASS', '')
+    db_name = os.getenv('DB_NAME', 'db_polda_kalsel')
+    db_port_env = os.getenv('DB_PORT')
+    connect_kwargs = {
+        'host': db_host,
+        'user': db_user,
+        'password': db_pass,
+        'database': db_name,
+    }
+    if db_port_env:
+        try:
+            connect_kwargs['port'] = int(db_port_env)
+        except ValueError:
+            pass
+
+    return mysql.connector.connect(**connect_kwargs)
 
 def get_tanggal_aktif():
     tanggal = request.args.get('tanggal')
