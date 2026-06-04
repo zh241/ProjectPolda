@@ -19,6 +19,90 @@ from flask_limiter.util import get_remote_address
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
+# ==========================================
+# AUTO SETUP DATABASE SAAT STARTUP
+# ==========================================
+def init_db():
+    try:
+        conn = mysql.connector.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            user=os.getenv('DB_USER', 'root'),
+            password=os.getenv('DB_PASS', ''),
+            database=os.getenv('DB_NAME', 'db_polda_kalsel'),
+        )
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS `arsip_log_kendaraan` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `waktu` timestamp NOT NULL DEFAULT current_timestamp(),
+              `arah` varchar(10) NOT NULL DEFAULT 'MASUK',
+              `jenis_kendaraan` varchar(50) NOT NULL,
+              `plat_nomor` varchar(20) NOT NULL,
+              `kategori` varchar(50) NOT NULL,
+              `foto_bukti` varchar(255) NOT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS `data_tamu` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `nama_tamu` varchar(100) NOT NULL,
+              `plat_nomor` varchar(20) NOT NULL,
+              `instansi` varchar(100) DEFAULT NULL,
+              `tujuan` varchar(255) NOT NULL,
+              `no_id_tamu` varchar(50) DEFAULT NULL,
+              `status` varchar(20) DEFAULT 'AKTIF',
+              `waktu_datang` timestamp NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS `log_kendaraan` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `waktu` timestamp NOT NULL DEFAULT current_timestamp(),
+              `arah` varchar(10) NOT NULL DEFAULT 'MASUK',
+              `jenis_kendaraan` varchar(50) NOT NULL,
+              `plat_nomor` varchar(20) NOT NULL,
+              `kategori` varchar(50) NOT NULL,
+              `foto_bukti` varchar(255) NOT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS `pengguna` (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `username` varchar(50) NOT NULL,
+              `password` varchar(255) NOT NULL,
+              `nama_lengkap` varchar(100) NOT NULL,
+              `role` varchar(20) NOT NULL DEFAULT 'Operator',
+              `terakhir_login` timestamp NULL DEFAULT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `username` (`username`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        """)
+
+        # Insert akun admin default kalau belum ada
+        cursor.execute("SELECT COUNT(*) FROM pengguna")
+        (total,) = cursor.fetchone()
+        if total == 0:
+            cursor.execute("""
+                INSERT INTO pengguna (username, password, nama_lengkap, role) VALUES
+                ('admin', 'scrypt:32768:8:1$21sJLOLBlKqzMhqO$a73527aec7943593acc4410e2c75e17f07610e4af822fcd98070efcba67b1d707e68971cb31985791c81eb64f183f8e1c47c0da4b302a256d0fc24ed1774aa81', 'Bid Tik', 'Super Admin')
+            """)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✅ Database OK: semua tabel siap.")
+    except Exception as e:
+        print(f"⚠️ init_db error: {e}")
+
+init_db()
+
 app = Flask(__name__)
 
 app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(32))
@@ -40,40 +124,13 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-from urllib.parse import urlparse
-
-
 def get_db_connection():
-    db_url = os.getenv('DB_HOST') or os.getenv('DATABASE_URL') or os.getenv('MYSQL_URL')
-    if db_url and db_url.startswith('mysql://'):
-        parsed = urlparse(db_url)
-        return mysql.connector.connect(
-            host=parsed.hostname,
-            port=parsed.port or 3306,
-            user=parsed.username,
-            password=parsed.password,
-            database=parsed.path.lstrip('/'),
-        )
-
-    # Support DB_PORT environment variable for explicit port setting
-    db_host = os.getenv('DB_HOST', 'localhost')
-    db_user = os.getenv('DB_USER', 'root')
-    db_pass = os.getenv('DB_PASS', '')
-    db_name = os.getenv('DB_NAME', 'db_polda_kalsel')
-    db_port_env = os.getenv('DB_PORT')
-    connect_kwargs = {
-        'host': db_host,
-        'user': db_user,
-        'password': db_pass,
-        'database': db_name,
-    }
-    if db_port_env:
-        try:
-            connect_kwargs['port'] = int(db_port_env)
-        except ValueError:
-            pass
-
-    return mysql.connector.connect(**connect_kwargs)
+    return mysql.connector.connect(
+        host=os.getenv('DB_HOST', 'localhost'),
+        user=os.getenv('DB_USER', 'root'),
+        password=os.getenv('DB_PASS', ''),
+        database=os.getenv('DB_NAME', 'db_polda_kalsel'),
+    )
 
 def get_tanggal_aktif():
     tanggal = request.args.get('tanggal')
