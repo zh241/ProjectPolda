@@ -862,6 +862,31 @@ def toggle_theme():
     session['theme'] = 'dark' if session.get('theme') == 'light' else 'light'
     return redirect(request.referrer or url_for('index'))
 
+# ==========================================
+# RUTE API: PENERIMA FOTO DARI LOKAL (AI)
+# ==========================================
+@app.route('/api/upload_foto', methods=['POST'])
+@csrf.exempt  # Wajib ditambahkan agar AI lokal tidak diblokir oleh sistem keamanan CSRF Flask
+def upload_foto():
+    if 'foto' not in request.files:
+        return {"status": "gagal", "pesan": "Tidak ada file foto yang dikirim"}, 400
+        
+    file = request.files['foto']
+    nama_file = request.form.get('nama_file')
+    
+    if file and nama_file:
+        # Pastikan folder penyimpanan tersedia
+        foto_dir = os.path.join('static', 'foto_kendaraan')
+        if not os.path.exists(foto_dir):
+            os.makedirs(foto_dir)
+            
+        # Simpan file yang diterima ke folder static di server Railway
+        path_simpan = os.path.join(foto_dir, nama_file)
+        file.save(path_simpan)
+        return {"status": "sukses", "pesan": "Foto berhasil diamankan di server!"}, 200
+        
+    return {"status": "gagal", "pesan": "Data tidak lengkap"}, 400
+
 if __name__ == '__main__':
     debug_mode = os.getenv('FLASK_DEBUG', '0') == '1'
     port = int(os.getenv('PORT', 5005))

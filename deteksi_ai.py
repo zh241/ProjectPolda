@@ -7,6 +7,7 @@ import queue
 import json
 import mysql.connector
 import numpy as np
+import requests
 from collections import deque, defaultdict
 from ultralytics import YOLO
 from flask import Flask, Response
@@ -80,15 +81,30 @@ def pekerja_background():
         if tugas is None: break
         foto, nama_foto, foto_dir, waktu_dt, label, id_str = tugas
         try:
-            cv2.imwrite(os.path.join(foto_dir, nama_foto), foto)
+            # 1. Simpan foto ke hardisk laptop lokal (sebagai backup)
+            path_lokal = os.path.join(foto_dir, nama_foto)
+            cv2.imwrite(path_lokal, foto)
+            
+            # 2. Masukkan data teks ke Database Railway (karena .env sudah diubah)
             ok_db = insert_db(waktu_dt, label, nama_foto)
-            print(f"{'✅' if ok_db else '📸'} [{waktu_dt.strftime('%H:%M:%S')}] "
-                  f"{label} {id_str} -> {nama_foto}")
+            
+            # 3. PROSES KURIR: Kirim file foto fisik ke server Railway
+            url_railway = "https://digital-gate-poldakalsel.up.railway.app/api/upload_foto"
+            
+            with open(path_lokal, 'rb') as f:
+                file_kirim = {'foto': f}
+                data_teks = {'nama_file': nama_foto}
+                # Timeout 5 detik agar tidak membuat AI lag jika koneksi internet lambat
+                respon = requests.post(url_railway, files=file_kirim, data=data_teks, timeout=5)
+            
+            status_kirim = "🚀 Terkirim ke Cloud" if respon.status_code == 200 else f"⚠️ Gagal Kirim: {respon.status_code}"
+            
+            print(f"{'✅' if ok_db else '📸'} [{waktu_dt.strftime('%H:%M:%S')}] {label} {id_str} -> {nama_foto} | {status_kirim}")
+            
         except Exception as e:
-            print(f"❌ Gagal simpan: {e}")
+            print(f"❌ Gagal simpan/kirim: {e}")
+            
         q_tugas.task_done()
-
-threading.Thread(target=pekerja_background, daemon=True).start()
 
 # ==========================================
 # CONFIG & ZONA BLOKIR
