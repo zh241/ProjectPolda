@@ -496,9 +496,14 @@ def connect_camera():
         print(f"⚠️ Gagal membaca config, pakai Webcam (0). Error: {e}")
 
     print(f"📡 Menghubungkan ke Kamera: {rtsp_target}")
-    cap = cv2.VideoCapture(rtsp_target, cv2.CAP_FFMPEG)
-    if isinstance(rtsp_target, str): 
+    
+    # Pisahkan perlakuan untuk Webcam (0) dan CCTV RTSP
+    if str(rtsp_target) == '0':
+        cap = cv2.VideoCapture(0) # Tanpa FFMPEG agar webcam laptop bisa terbuka
+    else:
+        cap = cv2.VideoCapture(rtsp_target, cv2.CAP_FFMPEG)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
     return cap
 
 cap = connect_camera()

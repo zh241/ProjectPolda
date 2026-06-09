@@ -8,6 +8,7 @@ import datetime
 import json
 import psutil 
 import socket
+import requests
 from functools import wraps 
 
 from dotenv import load_dotenv
@@ -363,10 +364,16 @@ def system_health():
     ram_usage = psutil.virtual_memory().percent
     
     ai_running = False
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.2) 
-        if s.connect_ex(('127.0.0.1', 5050)) == 0:
+    try:
+        # GANTI URL DI BAWAH dengan URL Ngrok milikmu!
+        url_ngrok = "https://immature-outback-wobbling.ngrok-free.app/video_feed" 
+        
+        # Mengecek apakah terowongan Ngrok aktif dan AI memancarkan video
+        respon = requests.get(url_ngrok, stream=True, timeout=2)
+        if respon.status_code == 200:
             ai_running = True
+    except: 
+        pass
 
     status_ai = "RUNNING" if ai_running else "OFFLINE"
     cam1 = "ACTIVE" if ai_running else "OFFLINE"
