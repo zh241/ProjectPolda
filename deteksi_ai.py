@@ -7,7 +7,7 @@ import queue
 import json
 import mysql.connector
 import numpy as np
-from collections import deque
+from collections import deque, defaultdict
 from ultralytics import YOLO
 from flask import Flask, Response
 
@@ -25,7 +25,6 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 # ==========================================
 # DATABASE & WORKER THREAD
 # ==========================================
-# [SECURITY PATCH] Membaca kredensial dari file .env
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASS = os.getenv("DB_PASS", "")
@@ -98,10 +97,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FOTO_DIR = os.path.join(WEBSITE_DIR, "static", "foto_kendaraan")
 os.makedirs(FOTO_DIR, exist_ok=True)
 
-WARNA = {
+WARNA = defaultdict(lambda: (200, 200, 200))
+WARNA.update({
     "Mobil": (255, 100,   0), "Motor": (  0, 220,   0),
     "Bus"  : (  0,  50, 220), "Truk" : (  0, 200, 255),
-}
+    "Polisi": (255,  50,  50)
+})
 
 ROI_X1, ROI_Y1 = 160,  60
 ROI_X2, ROI_Y2 = 640, 360
@@ -129,7 +130,7 @@ def adalah_motor(x1, y1, x2, y2):
     return True
 
 # ==========================================
-# PELACAK UNIVERSAL HYBRID (FIX DOUBLE COUNT)
+# PELACAK UNIVERSAL HYBRID 
 # ==========================================
 class PelacakObjek:
     def __init__(self, max_dist=150, max_age=25):
@@ -139,7 +140,6 @@ class PelacakObjek:
     def update(self, detections):
         for tr in self.tracks.values(): tr["updated"] = False
         hasil = []
-        KEND_BESAR = ('Mobil', 'Bus', 'Truk')
         
         for (cx, cy, x1, y1, x2, y2, label) in detections:
             best_id, best_score = None, 99999
@@ -147,7 +147,10 @@ class PelacakObjek:
             for tid, tr in self.tracks.items():
                 if tr["updated"]: continue
                 
-                label_cocok = (tr["label"] == label) or (tr["label"] in KEND_BESAR and label in KEND_BESAR)
+                is_kend_besar_lama = "motor" not in tr["label"].lower()
+                is_kend_besar_baru = "motor" not in label.lower()
+                
+                label_cocok = (tr["label"] == label) or (is_kend_besar_lama and is_kend_besar_baru)
                 if not label_cocok: continue
                 
                 xA, yA = max(x1, tr["x1"]), max(y1, tr["y1"])
@@ -255,13 +258,13 @@ class KendaraanRegistry:
 
         label     = d["label"]
         waktu_dt  = datetime.datetime.now()
-        nama_foto = f"{label}_{id_str.replace('_','')}_{waktu_dt.strftime('%Y%m%d_%H%M%S')}.jpg"
+        nama_foto = f"{label.replace(' ', '_')}_{id_str.replace('_','')}_{waktu_dt.strftime('%Y%m%d_%H%M%S')}.jpg"
 
         hd_x1, hd_y1 = int(d["x1"]*ratio_x), int(d["y1"]*ratio_y)
         hd_x2, hd_y2 = int(d["x2"]*ratio_x), int(d["y2"]*ratio_y)
 
         foto  = frame_hd.copy()
-        color = WARNA.get(label, (200,200,200))
+        color = WARNA[label]
         cv2.rectangle(foto,(hd_x1,hd_y1),(hd_x2,hd_y2),color,4)
         cv2.putText(foto, f"{label} {waktu_dt.strftime('%H:%M:%S')}",
                     (hd_x1, hd_y1-10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 3)
@@ -274,37 +277,41 @@ class KendaraanRegistry:
         for k in hapus: del self.data[k]
 
 # ==========================================
-# INFERENCE THREAD
+# INFERENCE THREAD (DIPERBARUI SINKRONISASI WAKTU)
 # ==========================================
 class InferenceThread:
     def __init__(self, model):
-        self.model          = model
-        self.frame_input    = None
-        self.hasil_output   = []
-        self.frame_id       = 0
-        self.last_id        = -1
-        self.ada_hasil_baru = False
-        self.lock_input     = threading.Lock()
-        self.lock_output    = threading.Lock()
-        self.running        = True
+        self.model           = model
+        self.frame_input     = None
+        self.frame_hd_input  = None # <-- Memori untuk gambar asli HD
+        self.frame_hd_output = None # <-- Gambar asli HD yang dikembalikan
+        self.hasil_output    = []
+        self.frame_id        = 0
+        self.last_id         = -1
+        self.ada_hasil_baru  = False
+        self.lock_input      = threading.Lock()
+        self.lock_output     = threading.Lock()
+        self.running         = True
         threading.Thread(target=self._run, daemon=True).start()
 
-    def kirim_frame(self, frame):
+    def kirim_frame(self, frame, frame_hd):
         with self.lock_input:
-            self.frame_input = frame.copy()
-            self.frame_id   += 1
+            self.frame_input    = frame.copy()
+            self.frame_hd_input = frame_hd # Titipkan gambar HD asli saat ini
+            self.frame_id      += 1
 
     def ambil_hasil(self):
         with self.lock_output:
             if self.ada_hasil_baru:
                 self.ada_hasil_baru = False
-                return True, list(self.hasil_output)
-            return False, []
+                return True, list(self.hasil_output), self.frame_hd_output
+            return False, [], None
 
     def _run(self):
         while self.running:
             with self.lock_input:
                 frame    = self.frame_input
+                frame_hd = self.frame_hd_input
                 frame_id = self.frame_id
 
             if frame is None or frame_id == self.last_id:
@@ -315,8 +322,7 @@ class InferenceThread:
 
             try:
                 hasil = self.model.predict(
-                    frame, classes=[0, 2, 5, 7],
-                    imgsz=320, conf=0.15, verbose=False
+                    frame, imgsz=320, conf=0.25, verbose=False
                 )
 
                 kandidat_awal = []
@@ -332,36 +338,28 @@ class InferenceThread:
 
                         cls  = int(box.cls[0])
                         conf = float(box.conf[0])
+                        nama_label = self.model.names[cls]
 
-                        if cls == 0:
+                        if "motor" in nama_label.lower():
                             if adalah_motor(x1, y1, x2, y2):
                                 kandidat_awal.append({
                                     'cx':cx,'cy':cy,'x1':x1,'y1':y1,
-                                    'x2':x2,'y2':y2,'label':"Motor",'conf':conf
+                                    'x2':x2,'y2':y2,'label':nama_label,'conf':conf
                                 })
-                        elif cls == 2 and conf >= 0.32:
+                        else:
                             kandidat_awal.append({
                                 'cx':cx,'cy':cy,'x1':x1,'y1':y1,
-                                'x2':x2,'y2':y2,'label':"Mobil",'conf':conf
-                            })
-                        elif cls == 5 and conf >= 0.48:
-                            kandidat_awal.append({
-                                'cx':cx,'cy':cy,'x1':x1,'y1':y1,
-                                'x2':x2,'y2':y2,'label':"Bus",'conf':conf
-                            })
-                        elif cls == 7 and conf >= 0.43:
-                            kandidat_awal.append({
-                                'cx':cx,'cy':cy,'x1':x1,'y1':y1,
-                                'x2':x2,'y2':y2,'label':"Truk",'conf':conf
+                                'x2':x2,'y2':y2,'label':nama_label,'conf':conf
                             })
 
                 posisi_motor = [
                     (d['cx'], d['cy'], d['y2']) for d in kandidat_awal
-                    if d['label'] == 'Motor'
+                    if "motor" in d['label'].lower()
                 ]
+                
                 kandidat_setelah_cross_nms = []
                 for d in kandidat_awal:
-                    if d['label'] in ('Mobil', 'Bus', 'Truk'):
+                    if "motor" not in d['label'].lower():
                         tumpang_dengan_motor = False
                         for mx, my, my2 in posisi_motor:
                             if abs(d['cx']-mx) < 80 and abs(d['cy']-my) < 80 and abs(d['y2']-my2) < 60:
@@ -371,13 +369,14 @@ class InferenceThread:
                             continue  
                     kandidat_setelah_cross_nms.append(d)
 
-                KEND_BESAR = ('Mobil', 'Bus', 'Truk')
                 deteksi_final = []
-                
                 for k in kandidat_setelah_cross_nms:
                     is_double = False
                     for d_fin in deteksi_final:
-                        if k['label'] in KEND_BESAR and d_fin['label'] in KEND_BESAR:
+                        is_k_besar = "motor" not in k['label'].lower()
+                        is_dfin_besar = "motor" not in d_fin['label'].lower()
+                        
+                        if is_k_besar and is_dfin_besar:
                             if abs(k['y2'] - d_fin['y2']) < 70:
                                 xA = max(k['x1'], d_fin['x1'])
                                 yA = max(k['y1'], d_fin['y1'])
@@ -396,7 +395,7 @@ class InferenceThread:
                                         d_fin.update(k) 
                                     break
                                     
-                        elif k['label'] == 'Motor' and d_fin['label'] == 'Motor':
+                        elif "motor" in k['label'].lower() and "motor" in d_fin['label'].lower():
                             if abs(k['cx']-d_fin['cx']) < 60 and abs(k['cy']-d_fin['cy']) < 60:
                                 is_double = True
                                 if k['conf'] > d_fin['conf']:
@@ -410,8 +409,9 @@ class InferenceThread:
                             d['x2'],d['y2'],d['label']) for d in deteksi_final]
 
                 with self.lock_output:
-                    self.hasil_output   = deteksi
-                    self.ada_hasil_baru = True
+                    self.hasil_output    = deteksi
+                    self.frame_hd_output = frame_hd # <-- Kembalikan memori gambar yang pas!
+                    self.ada_hasil_baru  = True
 
             except Exception:
                 time.sleep(0.01)
@@ -420,7 +420,7 @@ class InferenceThread:
         self.running = False
 
 # ==========================================
-# 2. FLASK WEB STREAMING SETUP & GENERATOR
+# FLASK WEB STREAMING SETUP & GENERATOR
 # ==========================================
 app = Flask(__name__)
 frame_stream_terbaru = None
@@ -430,12 +430,10 @@ def gen_frames():
     global frame_stream_terbaru
     while True:
         frame_copy = None
-        # [SECURITY PATCH] Cegah Deadlock: Lock hanya dipakai super singkat untuk meng-copy gambar
         with lock_stream:
             if frame_stream_terbaru is not None:
                 frame_copy = frame_stream_terbaru.copy()
                 
-        # time.sleep dipindah ke LUAR area lock agar OpenCV tidak ikut tertahan/lag!
         if frame_copy is None:
             time.sleep(0.01)
             continue
@@ -450,17 +448,18 @@ def gen_frames():
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-print("🌐 Memulai Server Web Stream di port 5050 (http://localhost:5050/video_feed)...")
+print("🌐 Memulai Server Web Stream di port 5050...")
 threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5050, debug=False, use_reloader=False), daemon=True).start()
 
 # ==========================================
 # INIT & DYNAMIC RTSP CONFIG READER
 # ==========================================
-model         = YOLO("yolov8s.pt")
+model         = YOLO("best.pt")
 inference     = InferenceThread(model)
 registry      = KendaraanRegistry()
 pelacak_objek = PelacakObjek()
-stat          = {"Mobil": 0, "Motor": 0, "Bus": 0, "Truk": 0}
+
+stat = defaultdict(int)
 
 fps_list       = deque(maxlen=30)
 prev_t         = time.time()
@@ -468,9 +467,8 @@ boxes_display  = []
 last_bersih    = time.time()
 frame_hd_cache = None
 
-# [SECURITY PATCH] Membaca URL RTSP dari Web Config (Jembatan app.py)
 def connect_camera():
-    rtsp_target = 0 # Default (Webcam)
+    rtsp_target = 0 
     try:
         config_path = os.path.join(WEBSITE_DIR, "config.json")
         if os.path.exists(config_path):
@@ -479,16 +477,16 @@ def connect_camera():
                 url = config.get('rtsp_cam1', '0')
                 rtsp_target = int(url) if str(url).isdigit() else url
     except Exception as e:
-        print(f"⚠️ Gagal membaca config.json, menggunakan Webcam (0). Error: {e}")
+        print(f"⚠️ Gagal membaca config, pakai Webcam (0). Error: {e}")
 
     print(f"📡 Menghubungkan ke Kamera: {rtsp_target}")
     cap = cv2.VideoCapture(rtsp_target, cv2.CAP_FFMPEG)
-    if isinstance(rtsp_target, str): # Jika IP Camera, gunakan buffer minim agar tidak delay
+    if isinstance(rtsp_target, str): 
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     return cap
 
 cap = connect_camera()
-print("🚀 V8.14 THE APEX PREDATOR | Bebas Ganda, Konvoi Lancar Tanpa Hambatan!")
+print("🚀 V8.16 TIME MACHINE | Screenshot dijamin tepat sasaran!")
 
 # ==========================================
 # MAIN LOOP
@@ -496,7 +494,6 @@ print("🚀 V8.14 THE APEX PREDATOR | Bebas Ganda, Konvoi Lancar Tanpa Hambatan!
 waktu_cek_config = time.time()
 rtsp_saat_ini = None 
 
-# (Logika untuk menyimpan rtsp awal)
 try:
     with open(os.path.join(WEBSITE_DIR, "config.json"), 'r') as f:
         rtsp_saat_ini = json.load(f).get('rtsp_cam1', '0')
@@ -506,25 +503,22 @@ while True:
     try: ret, frame_hd = cap.read()
     except Exception: ret = False
 
-    now = time.time() # Ambil waktu sekarang
+    now = time.time()
     
-    # --- SENSOR PERUBAHAN RTSP DARI WEB ---
-    if now - waktu_cek_config > 5: # Cek perubahan RTSP setiap 5 detik
+    if now - waktu_cek_config > 5: 
         waktu_cek_config = now
         try:
             with open(os.path.join(WEBSITE_DIR, "config.json"), 'r') as f:
                 rtsp_baru = json.load(f).get('rtsp_cam1', '0')
                 if str(rtsp_baru) != str(rtsp_saat_ini):
-                    print(f"🔄 PERINTAH WEB DITERIMA! Pindah dari {rtsp_saat_ini} ke {rtsp_baru}")
+                    print(f"🔄 PERINTAH WEB DITERIMA! Pindah ke {rtsp_baru}")
                     rtsp_saat_ini = rtsp_baru
                     cap.release()
                     time.sleep(1)
                     cap = connect_camera()
-                    continue # Langsung restart putaran loop
+                    continue 
         except: pass
-    # ----------------------------------------
 
-    # --- LOGIKA RECONNECT JIKA KAMERA MATI ---
     if not ret or frame_hd is None:
         print("⚠️ Reconnecting...")
         try: cap.release()
@@ -533,7 +527,6 @@ while True:
         cap = connect_camera() 
         continue
 
-    frame_hd_cache   = frame_hd
     h_hd, w_hd       = frame_hd.shape[:2]
     ratio_x, ratio_y = w_hd/640, h_hd/360
 
@@ -545,10 +538,14 @@ while True:
     h, w    = frame.shape[:2]
     garis_y = int(h * GARIS_PERSEN)
 
-    inference.kirim_frame(frame)
-    ada_baru, deteksi_terbaru = inference.ambil_hasil()
+    # Kirim frame kecil untuk diproses, DAN frame HD asli untuk disimpan di memori
+    inference.kirim_frame(frame, frame_hd)
+    
+    # Ambil frame HD yang sudah SINKRON dengan kotak deteksinya
+    ada_baru, deteksi_terbaru, frame_hd_sinkron = inference.ambil_hasil()
 
     if ada_baru:
+        frame_hd_cache = frame_hd_sinkron # <-- Update cache hanya dengan frame yang sinkron!
         objek_terlacak = pelacak_objek.update(deteksi_terbaru)
         boxes_display  = []
         for (tid, cx, cy, x1, y1, x2, y2, label) in objek_terlacak:
@@ -587,25 +584,24 @@ while True:
     cv2.putText(frame,f"FPS:{fps_avg}",(10,28),
                 cv2.FONT_HERSHEY_SIMPLEX,0.7,(0,255,100),2)
 
-    px,py = w-168,5
-    cv2.rectangle(frame,(px,py),(w-2,py+108),(0,0,0),-1)
+    px,py = w-180,5
+    jumlah_baris = len(stat) if len(stat) > 0 else 1
+    cv2.rectangle(frame,(px,py),(w-2,py+40+(jumlah_baris*18)),(0,0,0),-1)
     cv2.putText(frame,"TOTAL MASUK",(px+5,py+18),
                 cv2.FONT_HERSHEY_SIMPLEX,0.42,(180,180,180),1)
+    
     yo = py+36
-    for lbl in ["Mobil","Motor","Bus","Truk"]:
-        cv2.putText(frame,f"{lbl:<6}: {stat[lbl]:>3}",(px+5,yo),
+    for lbl, jumlah in stat.items():
+        cv2.putText(frame,f"{lbl[:10]:<10}: {jumlah:>3}",(px+5,yo),
                     cv2.FONT_HERSHEY_SIMPLEX,0.42,WARNA[lbl],1)
         yo += 18
-    cv2.putText(frame,f"Total  : {sum(stat.values()):>3}",(px+5,yo+2),
+        
+    cv2.putText(frame,f"Total      : {sum(stat.values()):>3}",(px+5,yo+2),
                 cv2.FONT_HERSHEY_SIMPLEX,0.44,(255,255,255),1)
     
-    # ==========================================
-    # 3. KIRIM FOTO KE FLASK (DARI SINI)
-    # ==========================================
     with lock_stream:
         frame_stream_terbaru = frame.copy()
 
-    # Jendela Desktop Tetap Ada (Sesuai Perintah Komandan)
     cv2.imshow("MONITOR CCTV POLDA", frame)
 
     if now - last_bersih > 30:
@@ -615,7 +611,7 @@ while True:
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'): break
     elif key == ord('r'):
-        stat = {k:0 for k in stat}
+        stat.clear()
         registry.data.clear()
         pelacak_objek.tracks.clear()
         boxes_display = []
@@ -626,4 +622,4 @@ q_tugas.put(None)
 cap.release()
 if db: db.close()
 cv2.destroyAllWindows()
-print(f"\n📊 Rekap: {stat} | Total: {sum(stat.values())}")
+print(f"\n📊 Rekap: {dict(stat)} | Total: {sum(stat.values())}")
