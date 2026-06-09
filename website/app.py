@@ -379,7 +379,6 @@ def system_health():
 def statistik():
     db = get_db_connection()
     cursor = db.cursor()
-
     cursor.execute("""
         SELECT COUNT(*) as total,
             SUM(CASE WHEN kategori = 'Polisi' THEN 1 ELSE 0 END) as dinas,
@@ -393,17 +392,23 @@ def statistik():
         'sipil': row_stats[2] if row_stats[2] else 0
     }
 
+    # FIX: pakai subquery, hindari SELECT kolom non-aggregated di luar GROUP BY
     cursor.execute("""
-        SELECT CONCAT(LPAD(HOUR(waktu), 2, '0'), ':00 - ', LPAD(HOUR(waktu)+1, 2, '0'), ':00') 
-        FROM log_kendaraan WHERE waktu >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-        GROUP BY HOUR(waktu) ORDER BY COUNT(*) DESC LIMIT 1
+        SELECT CONCAT(LPAD(jam, 2, '0'), ':00 - ', LPAD(jam+1, 2, '0'), ':00')
+        FROM (
+            SELECT HOUR(waktu) AS jam, COUNT(*) AS total
+            FROM log_kendaraan
+            WHERE waktu >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY HOUR(waktu)
+            ORDER BY total DESC
+            LIMIT 1
+        ) AS sub
     """)
     row_jam = cursor.fetchone()
     jam_sibuk = row_jam[0] if row_jam else "00:00 - 00:00"
 
     dinas_array = [0, 0, 0, 0, 0, 0, 0]
     sipil_array = [0, 0, 0, 0, 0, 0, 0]
-
     cursor.execute("""
         SELECT WEEKDAY(waktu), kategori, COUNT(*) FROM log_kendaraan
         WHERE waktu >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY WEEKDAY(waktu), kategori
@@ -415,7 +420,6 @@ def statistik():
         if hari_index is not None:
             if kategori == 'Polisi': dinas_array[hari_index] += jumlah
             else: sipil_array[hari_index] += jumlah
-
     data_grafik = json.dumps({'dinas': dinas_array, 'sipil': sipil_array})
     cursor.close()
     db.close()
