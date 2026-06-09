@@ -129,11 +129,11 @@ def login_required(f):
 
 def get_db_connection():
     return mysql.connector.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        port=int(os.getenv('DB_PORT', 3306)),
-        user=os.getenv('DB_USER', 'root'),
-        password=os.getenv('DB_PASS', ''),
-        database=os.getenv('DB_NAME', 'db_polda_kalsel'),
+        host=os.getenv('DB_HOST', os.getenv('MYSQLHOST', 'localhost')),
+        port=int(os.getenv('DB_PORT', os.getenv('MYSQLPORT', 3306))),
+        user=os.getenv('DB_USER', os.getenv('MYSQLUSER', 'root')),
+        password=os.getenv('DB_PASS', os.getenv('MYSQLPASSWORD', '')),
+        database=os.getenv('DB_NAME', os.getenv('MYSQLDATABASE', 'railway')),
         use_pure=True,
     )
 
