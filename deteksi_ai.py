@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 # Load variabel rahasia dari file .env
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEBSITE_DIR = os.path.join(BASE_DIR, "website")
-load_dotenv(os.path.join(WEBSITE_DIR, ".env"))
+load_dotenv(os.path.join(WEBSITE_DIR, ".env"), override=False)
 
 os.environ["OPENCV_LOG_LEVEL"]              = "SILENT"
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"

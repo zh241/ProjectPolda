@@ -18,7 +18,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 
 # ==========================================
 # AUTO SETUP DATABASE SAAT STARTUP
