@@ -58,12 +58,11 @@
                         agar browser tidak kena halaman interstitial Ngrok dan langsung
                         membuka stream MJPEG dari deteksi_ai.py
                     #}
-                    <img id="cctv-stream"
-                         src="{{ ngrok_url }}/video_feed?ngrok-skip-browser-warning=true"
-                         class="img-fluid w-100 h-100"
-                         style="object-fit: cover; display: block;"
-                         alt="Mencoba terhubung ke Kamera AI..."
-                         onerror="kameraMati()">
+                    <iframe id="cctv-stream"
+                            src="{{ ngrok_url }}/video_feed?ngrok-skip-browser-warning=true"
+                            style="width:100%; min-height:480px; border:none; display:block;"
+                            allowfullscreen>
+                    </iframe>
                     {% else %}
                     {# Tampilkan pesan khusus jika URL Ngrok belum diset di Pengaturan #}
                     <div class="text-center p-5">
@@ -132,11 +131,9 @@
         var elem = document.getElementById("cctv-stream");
         if (!elem) return;
         if (!document.fullscreenElement) {
-            if (elem.requestFullscreen)            elem.requestFullscreen();
-            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-            else if (elem.msRequestFullscreen)     elem.msRequestFullscreen();
+            elem.requestFullscreen && elem.requestFullscreen();
         } else {
-            if (document.exitFullscreen) document.exitFullscreen();
+            document.exitFullscreen && document.exitFullscreen();
         }
     }
 
