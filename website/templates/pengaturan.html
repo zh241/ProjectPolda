@@ -11,44 +11,81 @@
 
     <div class="row g-4 justify-content-center">
         <div class="col-md-8">
-            <div class="card border-0 shadow-sm rounded-4 h-100" style="border-top: 4px solid #198754;">
+            <div class="card border-0 shadow-sm rounded-4" style="border-top: 4px solid #198754;">
                 <div class="card-body p-4 p-md-5">
                     <div class="d-flex align-items-center mb-4">
-                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style="width: 50px; height: 50px;">
                             <i class="bi bi-camera-video-fill fs-4"></i>
                         </div>
                         <h6 class="fw-bold text-dark mb-0 fs-5">Konfigurasi Jaringan CCTV</h6>
                     </div>
-                    
+
                     <form action="{{ url_for('pengaturan') }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        
-                        <div class="mb-5 bg-light p-4 rounded-4 border border-secondary border-opacity-10">
+
+                        <!-- RTSP Camera -->
+                        <div class="mb-4 bg-light p-4 rounded-4 border border-secondary border-opacity-10">
                             <label class="fw-bold small text-muted mb-2 text-uppercase" style="letter-spacing: 1px;">
                                 <i class="bi bi-link-45deg me-1"></i> URL RTSP - KAMERA GERBANG UTAMA MAKO
                             </label>
-                            
                             <div class="input-group shadow-sm mb-2">
                                 <span class="input-group-text bg-dark text-white fw-bold border-dark px-4">CAM 1</span>
-                                <input type="password" id="rtspInput" name="rtsp_cam1" class="form-control form-control-lg fw-bold text-dark border-end-0" 
+                                <input type="password" id="rtspInput" name="rtsp_cam1"
+                                       class="form-control form-control-lg fw-bold text-dark border-end-0"
                                        style="font-family: monospace; font-size: 0.95rem;"
-                                       value="{{ config.rtsp_cam1 if config else '' }}" 
+                                       value="{{ config.rtsp_cam1 if config else '' }}"
                                        placeholder="rtsp://admin:password@192.168.x.x:554/stream1">
-                                <button class="btn btn-outline-secondary bg-white border border-start-0" type="button" id="toggleRtsp" title="Lihat/Sembunyikan URL">
-                                    <i class="bi bi-eye-slash-fill text-muted" id="eyeIcon"></i>
+                                <button class="btn btn-outline-secondary bg-white border border-start-0"
+                                        type="button" id="toggleRtsp" title="Lihat/Sembunyikan URL">
+                                    <i class="bi bi-eye-slash-fill text-muted" id="eyeIconRtsp"></i>
                                 </button>
                             </div>
-                            
-                            <div class="d-flex align-items-start mt-3">
+                            <div class="d-flex align-items-start mt-2">
                                 <i class="bi bi-shield-lock-fill text-success me-2 mt-1"></i>
                                 <span class="form-text small fw-bold text-muted mb-0">
-                                    Masukkan URL RTSP / IP Camera resmi dari jaringan CCTV Gerbang Utama Polda Kalsel. <br>Sistem AI akan langsung membaca *stream* ini saat di-restart.
+                                    Masukkan URL RTSP / IP Camera dari jaringan CCTV Gerbang Utama.<br>
+                                    Sistem AI akan langsung membaca <em>stream</em> ini saat di-restart.
                                 </span>
                             </div>
                         </div>
 
+                        <!-- NGROK URL — FIELD BARU -->
+                        <div class="mb-5 bg-light p-4 rounded-4 border border-secondary border-opacity-10">
+                            <label class="fw-bold small text-muted mb-2 text-uppercase" style="letter-spacing: 1px;">
+                                <i class="bi bi-broadcast me-1"></i> URL Ngrok — Terowongan AI Lokal
+                            </label>
+                            <div class="input-group shadow-sm mb-2">
+                                <span class="input-group-text bg-primary text-white fw-bold border-primary px-3">
+                                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                                </span>
+                                <input type="text" id="ngrokInput" name="ngrok_url"
+                                       class="form-control form-control-lg fw-bold text-dark"
+                                       style="font-family: monospace; font-size: 0.9rem;"
+                                       value="{{ config.ngrok_url if config else '' }}"
+                                       placeholder="https://xxxx-xxxx.ngrok-free.app">
+                            </div>
+                            <div class="d-flex align-items-start mt-2">
+                                <i class="bi bi-info-circle-fill text-primary me-2 mt-1"></i>
+                                <span class="form-text small fw-bold text-muted mb-0">
+                                    Salin URL dari terminal Ngrok (tanpa <code>/video_feed</code>).<br>
+                                    Contoh: <code>https://immature-outback-wobbling.ngrok-free.app</code><br>
+                                    <span class="text-warning">⚠ Ngrok Free: URL berubah setiap kali program di-restart. Perbarui di sini setiap kali Ngrok dijalankan ulang.</span>
+                                </span>
+                            </div>
+
+                            <!-- Status indikator Ngrok real-time -->
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold"
+                                        onclick="testNgrok()">
+                                    <i class="bi bi-wifi me-1"></i> Test Koneksi Ngrok
+                                </button>
+                                <span id="ngrok-status" class="ms-2 small fw-bold d-none"></span>
+                            </div>
+                        </div>
+
                         <button type="submit" class="btn btn-success w-100 fw-bold rounded-pill shadow-sm py-3 fs-6 transition-hover">
-                            <i class="bi bi-save-fill me-2"></i> SIMPAN KONEKSI KAMERA
+                            <i class="bi bi-save-fill me-2"></i> SIMPAN KONFIGURASI
                         </button>
                     </form>
                 </div>
@@ -58,40 +95,65 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // Toggle RTSP password
+    document.addEventListener('DOMContentLoaded', function () {
         const toggleBtn = document.getElementById('toggleRtsp');
         const rtspInput = document.getElementById('rtspInput');
-        const eyeIcon = document.getElementById('eyeIcon');
-
-        if(toggleBtn) {
-            toggleBtn.addEventListener('click', function() {
+        const eyeIcon   = document.getElementById('eyeIconRtsp');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function () {
                 if (rtspInput.type === 'password') {
                     rtspInput.type = 'text';
-                    eyeIcon.classList.remove('bi-eye-slash-fill');
-                    eyeIcon.classList.add('bi-eye-fill');
+                    eyeIcon.classList.replace('bi-eye-slash-fill', 'bi-eye-fill');
                     eyeIcon.classList.replace('text-muted', 'text-primary');
                 } else {
                     rtspInput.type = 'password';
-                    eyeIcon.classList.remove('bi-eye-fill');
-                    eyeIcon.classList.add('bi-eye-slash-fill');
+                    eyeIcon.classList.replace('bi-eye-fill', 'bi-eye-slash-fill');
                     eyeIcon.classList.replace('text-primary', 'text-muted');
                 }
             });
         }
     });
+
+    // Test koneksi Ngrok langsung dari browser
+    function testNgrok() {
+        const url    = document.getElementById('ngrokInput').value.trim().replace(/\/$/, '');
+        const status = document.getElementById('ngrok-status');
+        if (!url) {
+            status.className = 'ms-2 small fw-bold text-warning';
+            status.textContent = '⚠ URL kosong!';
+            status.classList.remove('d-none');
+            return;
+        }
+        status.className = 'ms-2 small fw-bold text-info';
+        status.textContent = '⏳ Mengecek...';
+        status.classList.remove('d-none');
+
+        // Fetch ke video_feed dengan header bypass Ngrok interstitial
+        fetch(url + '/video_feed?ngrok-skip-browser-warning=true', {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(4000)
+        })
+        .then(res => {
+            if (res.ok) {
+                status.className = 'ms-2 small fw-bold text-success';
+                status.textContent = '✅ Terhubung! AI Online.';
+            } else {
+                status.className = 'ms-2 small fw-bold text-danger';
+                status.textContent = '❌ Gagal (HTTP ' + res.status + ')';
+            }
+        })
+        .catch(() => {
+            status.className = 'ms-2 small fw-bold text-danger';
+            status.textContent = '❌ Tidak bisa dijangkau. Cek URL / Ngrok aktif?';
+        });
+    }
 </script>
 
 <style>
     .transition-hover { transition: all 0.2s ease-in-out; }
     .transition-hover:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(25, 135, 84, 0.3) !important; }
-    
-    /* Mengakali border input agar menyatu dengan tombol mata */
-    .form-control:focus {
-        border-color: #dee2e6;
-        box-shadow: none;
-    }
-    [data-bs-theme="dark"] .form-control:focus {
-        border-color: #495057;
-    }
+    .form-control:focus { border-color: #dee2e6; box-shadow: none; }
+    [data-bs-theme="dark"] .form-control:focus { border-color: #495057; }
 </style>
 {% endblock %}
