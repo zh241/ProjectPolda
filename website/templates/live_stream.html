@@ -60,7 +60,7 @@
                     #}
                     <iframe id="cctv-stream"
                             src="{{ ngrok_url }}/video_feed?ngrok-skip-browser-warning=true"
-                            style="width:100%; min-height:480px; border:none; display:block;"
+                            style="width:100%; aspect-ratio:640/360; max-height:360px; border:none; display:block;"
                             allowfullscreen>
                     </iframe>
                     {% else %}

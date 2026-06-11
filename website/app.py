@@ -81,7 +81,7 @@ def init_db():
               `username` varchar(50) NOT NULL,
               `password` varchar(255) NOT NULL,
               `nama_lengkap` varchar(100) NOT NULL,
-              `role` varchar(20) NOT NULL DEFAULT 'Operator',
+              `role` varchar(20) NOT NULL DEFAULT 'Admin',
               `terakhir_login` timestamp NULL DEFAULT NULL,
               PRIMARY KEY (`id`),
               UNIQUE KEY `username` (`username`)
@@ -130,11 +130,11 @@ def login_required(f):
 
 def get_db_connection():
     return mysql.connector.connect(
-        host=os.getenv('DB_HOST', os.getenv('MYSQLHOST', 'localhost')),
-        port=int(os.getenv('DB_PORT', os.getenv('MYSQLPORT', 3306))),
-        user=os.getenv('DB_USER', os.getenv('MYSQLUSER', 'root')),
-        password=os.getenv('DB_PASS', os.getenv('MYSQLPASSWORD', '')),
-        database=os.getenv('DB_NAME', os.getenv('MYSQLDATABASE', 'railway')),
+        host=os.getenv('DB_HOST') or os.getenv('MYSQLHOST', 'localhost'),
+        port=int(os.getenv('DB_PORT') or os.getenv('MYSQLPORT') or 3306),
+        user=os.getenv('DB_USER') or os.getenv('MYSQLUSER', 'root'),
+        password=os.getenv('DB_PASS') or os.getenv('MYSQLPASSWORD', ''),
+        database=os.getenv('DB_NAME') or os.getenv('MYSQLDATABASE', 'railway'),
         use_pure=True,
     )
 
@@ -840,6 +840,11 @@ def upload_foto():
         file.save(os.path.join(foto_dir, nama_file))
         return {"status": "sukses", "pesan": "Foto berhasil diamankan di server!"}, 200
     return {"status": "gagal", "pesan": "Data tidak lengkap"}, 400
+
+@app.route('/api/get_config')
+def get_config_api():
+    cfg = get_config()
+    return {"rtsp_cam1": cfg.get("rtsp_cam1", "0"), "ngrok_url": cfg.get("ngrok_url", "")}
 
 if __name__ == '__main__':
     debug_mode = os.getenv('FLASK_DEBUG', '0') == '1'
