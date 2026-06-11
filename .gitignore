@@ -1,0 +1,13 @@
+# Credentials
+website/.env
+
+# Foto kendaraan
+website/static/foto_kendaraan/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
