@@ -130,11 +130,11 @@ def login_required(f):
 
 def get_db_connection():
     return mysql.connector.connect(
-        host=os.getenv('DB_HOST', os.getenv('MYSQLHOST', 'localhost')),
-        port=int(os.getenv('DB_PORT', os.getenv('MYSQLPORT', 3306))),
-        user=os.getenv('DB_USER', os.getenv('MYSQLUSER', 'root')),
-        password=os.getenv('DB_PASS', os.getenv('MYSQLPASSWORD', '')),
-        database=os.getenv('DB_NAME', os.getenv('MYSQLDATABASE', 'railway')),
+        host=os.getenv('DB_HOST') or os.getenv('MYSQLHOST', 'localhost'),
+        port=int(os.getenv('DB_PORT') or os.getenv('MYSQLPORT') or 3306),
+        user=os.getenv('DB_USER') or os.getenv('MYSQLUSER', 'root'),
+        password=os.getenv('DB_PASS') or os.getenv('MYSQLPASSWORD', ''),
+        database=os.getenv('DB_NAME') or os.getenv('MYSQLDATABASE', 'railway'),
         use_pure=True,
     )
 
@@ -827,18 +827,6 @@ def toggle_theme():
 # ==========================================
 # API: UPLOAD FOTO DARI AI LOKAL
 # ==========================================
-# ==========================================
-# API: KIRIM CONFIG KE AI LOKAL (LAPTOP)
-# ==========================================
-@app.route('/api/get_config')
-def api_get_config():
-    """Endpoint untuk deteksi_ai.py di laptop fetch config terbaru."""
-    cfg = get_config()
-    return {
-        "rtsp_cam1": cfg.get("rtsp_cam1", "0"),
-        "ngrok_url": cfg.get("ngrok_url", "")
-    }
-
 @app.route('/api/upload_foto', methods=['POST'])
 @csrf.exempt
 def upload_foto():
@@ -852,6 +840,11 @@ def upload_foto():
         file.save(os.path.join(foto_dir, nama_file))
         return {"status": "sukses", "pesan": "Foto berhasil diamankan di server!"}, 200
     return {"status": "gagal", "pesan": "Data tidak lengkap"}, 400
+
+@app.route('/api/get_config')
+def get_config_api():
+    cfg = get_config()
+    return {"rtsp_cam1": cfg.get("rtsp_cam1", "0"), "ngrok_url": cfg.get("ngrok_url", "")}
 
 if __name__ == '__main__':
     debug_mode = os.getenv('FLASK_DEBUG', '0') == '1'
