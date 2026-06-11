@@ -81,7 +81,7 @@ def init_db():
               `username` varchar(50) NOT NULL,
               `password` varchar(255) NOT NULL,
               `nama_lengkap` varchar(100) NOT NULL,
-              `role` varchar(20) NOT NULL DEFAULT 'Admin',
+              `role` varchar(20) NOT NULL DEFAULT 'Operator',
               `terakhir_login` timestamp NULL DEFAULT NULL,
               PRIMARY KEY (`id`),
               UNIQUE KEY `username` (`username`)
