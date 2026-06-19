@@ -164,7 +164,6 @@
                         <tr>
                             <th class="py-3">Waktu Terekam</th>
                             <th class="py-3">Jenis Kendaraan</th>
-                            <th class="py-3">Plat Nomor</th>
                             <th class="py-3">Kategori</th>
                             <th class="py-3 text-danger">Aksi</th>
                         </tr>
@@ -185,12 +184,11 @@
                                     <span class="fw-bold text-muted small text-uppercase">{{ baris.jenis_kendaraan }}</span>
                                 </div>
                             </td>
-                            <td><span class="badge bg-light border border-secondary border-opacity-25 px-4 py-2 fs-6 shadow-sm font-monospace text-dark rounded-pill">{{ baris.plat_nomor }}</span></td>
                             <td>
-                                {% if baris.kategori == 'Polisi' %}
-                                    <span class="text-success fw-bold small"><i class="bi bi-shield-fill-check me-1"></i> POLISI</span>
+                                {% if baris.kategori == 'Polisi' or baris.kategori == 'Dinas' %}
+                                    <span class="text-success fw-bold small"><i class="bi bi-shield-fill-check me-1"></i> POLISI (DINAS)</span>
                                 {% else %}
-                                    <span class="text-muted fw-bold small">SIPIL</span>
+                                    <span class="text-muted fw-bold small">SIPIL / UMUM</span>
                                 {% endif %}
                             </td>
                             <td>

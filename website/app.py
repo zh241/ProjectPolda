@@ -6,7 +6,6 @@ import pandas as pd
 import io
 import datetime
 import json
-import psutil 
 import socket
 import requests
 from functools import wraps 
@@ -35,24 +34,24 @@ def init_db():
         )
         cursor = conn.cursor()
 
+        # Tabel Arsip
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `arsip_log_kendaraan` (
               `id` int(11) NOT NULL AUTO_INCREMENT,
               `waktu` timestamp NOT NULL DEFAULT current_timestamp(),
               `arah` varchar(10) NOT NULL DEFAULT 'MASUK',
               `jenis_kendaraan` varchar(50) NOT NULL,
-              `plat_nomor` varchar(20) NOT NULL,
               `kategori` varchar(50) NOT NULL,
               `foto_bukti` varchar(255) NOT NULL,
               PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
 
+        # Tabel Tamu (Plat dihapus)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `data_tamu` (
               `id` int(11) NOT NULL AUTO_INCREMENT,
               `nama_tamu` varchar(100) NOT NULL,
-              `plat_nomor` varchar(20) NOT NULL,
               `instansi` varchar(100) DEFAULT NULL,
               `tujuan` varchar(255) NOT NULL,
               `no_id_tamu` varchar(50) DEFAULT NULL,
@@ -62,13 +61,13 @@ def init_db():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         """)
 
+        # Tabel Log
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS `log_kendaraan` (
               `id` int(11) NOT NULL AUTO_INCREMENT,
               `waktu` timestamp NOT NULL DEFAULT current_timestamp(),
               `arah` varchar(10) NOT NULL DEFAULT 'MASUK',
               `jenis_kendaraan` varchar(50) NOT NULL,
-              `plat_nomor` varchar(20) NOT NULL,
               `kategori` varchar(50) NOT NULL,
               `foto_bukti` varchar(255) NOT NULL,
               PRIMARY KEY (`id`)
@@ -96,10 +95,18 @@ def init_db():
                 ('admin', 'scrypt:32768:8:1$21sJLOLBlKqzMhqO$a73527aec7943593acc4410e2c75e17f07610e4af822fcd98070efcba67b1d707e68971cb31985791c81eb64f183f8e1c47c0da4b302a256d0fc24ed1774aa81', 'Bid Tik', 'Super Admin')
             """)
 
+        # AUTO-CLEANUP: Buang kolom plat_nomor jika database lama masih menyimpannya
+        try: cursor.execute("ALTER TABLE log_kendaraan DROP COLUMN plat_nomor")
+        except: pass
+        try: cursor.execute("ALTER TABLE arsip_log_kendaraan DROP COLUMN plat_nomor")
+        except: pass
+        try: cursor.execute("ALTER TABLE data_tamu DROP COLUMN plat_nomor")
+        except: pass
+
         conn.commit()
         cursor.close()
         conn.close()
-        print("✅ Database OK: semua tabel siap.")
+        print("✅ Database OK: Struktur bersih tanpa Plat Nomor.")
     except Exception as e:
         print(f"⚠️ init_db error: {e}")
 
@@ -115,6 +122,9 @@ limiter = Limiter(
     default_limits=["500 per day"],
     storage_uri="memory://"
 )
+
+# Variabel Global untuk Heartbeat AI
+last_heartbeat = {"cpu": 0, "ram": 0, "time": 0}
 
 # ==========================================
 # HELPER FUNCTIONS
@@ -139,31 +149,25 @@ def get_db_connection():
     )
 
 def get_config():
-    """Baca config.json, return dict. Aman jika file tidak ada."""
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
     default = {"rtsp_cam1": "0", "ngrok_url": ""}
     try:
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 data = json.load(f)
-                # Pastikan key ngrok_url selalu ada
-                if 'ngrok_url' not in data:
-                    data['ngrok_url'] = ""
+                if 'ngrok_url' not in data: data['ngrok_url'] = ""
                 return data
-    except:
-        pass
+    except: pass
     return default
 
 def save_config(data):
-    """Simpan config.json."""
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
     with open(config_path, 'w') as f:
         json.dump(data, f, indent=4)
 
 def get_tanggal_aktif():
     tanggal = request.args.get('tanggal')
-    if not tanggal:
-        tanggal = datetime.datetime.now().strftime('%Y-%m-%d')
+    if not tanggal: tanggal = datetime.datetime.now().strftime('%Y-%m-%d')
     return tanggal
 
 # ==========================================
@@ -181,8 +185,7 @@ def login():
         akun = cursor.fetchone()
         if akun:
             sandi_cocok = False
-            if check_password_hash(akun['password'], password):
-                sandi_cocok = True
+            if check_password_hash(akun['password'], password): sandi_cocok = True
             elif akun['password'] == password:
                 sandi_cocok = True
                 new_hash = generate_password_hash(password)
@@ -196,11 +199,9 @@ def login():
                 session['role'] = akun['role']
                 cursor.execute("UPDATE pengguna SET terakhir_login = CURRENT_TIMESTAMP WHERE id = %s", (akun['id'],))
                 db.commit()
-                cursor.close()
-                db.close()
+                cursor.close(); db.close()
                 return redirect(url_for('index'))
-        cursor.close()
-        db.close()
+        cursor.close(); db.close()
         flash('Username atau Password salah!', 'danger')
         return redirect(url_for('login'))
     return render_template('login.html')
@@ -225,21 +226,26 @@ def index():
                 batas_waktu = time.time() - (hari_auto * 86400)
                 for nama_file in os.listdir(foto_dir):
                     path_file = os.path.join(foto_dir, nama_file)
-                    if os.path.isfile(path_file) and os.path.getmtime(path_file) < batas_waktu:
-                        os.remove(path_file)
+                    if os.path.isfile(path_file) and os.path.getmtime(path_file) < batas_waktu: os.remove(path_file)
         except: pass
 
     tanggal_aktif = get_tanggal_aktif()
     db = get_db_connection()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT id, waktu, arah, jenis_kendaraan, plat_nomor, kategori, foto_bukti FROM log_kendaraan WHERE DATE(waktu) = %s ORDER BY waktu DESC LIMIT 5", (tanggal_aktif,))
+    
+    # Ambil data tanpa plat nomor
+    cursor.execute("SELECT id, waktu, arah, jenis_kendaraan, kategori, foto_bukti FROM log_kendaraan WHERE DATE(waktu) = %s ORDER BY waktu DESC LIMIT 5", (tanggal_aktif,))
     data_kendaraan = cursor.fetchall()
+    
     cursor.execute("SELECT kategori, jenis_kendaraan, arah FROM log_kendaraan WHERE DATE(waktu) = %s", (tanggal_aktif,))
     semua_data = cursor.fetchall()
+    
     stats = {'total': len(semua_data), 'dinas': 0, 'sipil': 0, 'mobil': 0, 'motor': 0, 'besar': 0, 'keluar': 0, 'mobil_out': 0, 'motor_out': 0, 'besar_out': 0}
     for row in semua_data:
-        if row['kategori'] == 'Polisi': stats['dinas'] += 1
+        # Polisi -> Dinas, Sisanya -> Sipil
+        if row['kategori'] == 'Polisi' or row['kategori'] == 'Dinas': stats['dinas'] += 1
         else: stats['sipil'] += 1
+        
         if row['arah'] == 'MASUK':
             if row['jenis_kendaraan'] == 'Mobil': stats['mobil'] += 1
             elif row['jenis_kendaraan'] == 'Motor': stats['motor'] += 1
@@ -249,10 +255,10 @@ def index():
             if row['jenis_kendaraan'] == 'Mobil': stats['mobil_out'] += 1
             elif row['jenis_kendaraan'] == 'Motor': stats['motor_out'] += 1
             elif row['jenis_kendaraan'] in ['Truk', 'Bus']: stats['besar_out'] += 1
+            
     cursor.execute("SELECT HOUR(waktu) as jam, kategori FROM log_kendaraan WHERE DATE(waktu) = %s", (tanggal_aktif,))
     raw_grafik = cursor.fetchall()
-    hitung_dinas = [0] * 6
-    hitung_sipil = [0] * 6
+    hitung_dinas, hitung_sipil = [0]*6, [0]*6
     for row in raw_grafik:
         jam = row['jam']
         slot = 0
@@ -262,11 +268,12 @@ def index():
         elif 15 <= jam < 18: slot = 3
         elif 18 <= jam < 21: slot = 4
         else: slot = 5
-        if row['kategori'] == "Polisi": hitung_dinas[slot] += 1
+        
+        if row['kategori'] == "Polisi" or row['kategori'] == "Dinas": hitung_dinas[slot] += 1
         else: hitung_sipil[slot] += 1
+        
     data_grafik_final = {"dinas": hitung_dinas, "sipil": hitung_sipil}
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return render_template('index.html', data_kendaraan=data_kendaraan, stats=stats, data_grafik=json.dumps(data_grafik_final), halaman='dashboard', tanggal_aktif=tanggal_aktif)
 
 @app.route('/log_harian')
@@ -277,15 +284,14 @@ def log_harian():
     arah_filter = request.args.get('arah', 'Semua')
     db = get_db_connection()
     cursor = db.cursor(dictionary=True)
-    query = "SELECT id, waktu, arah, jenis_kendaraan, plat_nomor, kategori, foto_bukti FROM log_kendaraan WHERE DATE(waktu) = %s"
+    query = "SELECT id, waktu, arah, jenis_kendaraan, kategori, foto_bukti FROM log_kendaraan WHERE DATE(waktu) = %s"
     params = [tanggal_aktif]
     if arah_filter != 'Semua': query += " AND arah = %s"; params.append(arah_filter)
-    if cari: query += " AND (plat_nomor LIKE %s OR jenis_kendaraan LIKE %s OR waktu LIKE %s)"; params.extend([f'%{cari}%', f'%{cari}%', f'%{cari}%'])
+    if cari: query += " AND (jenis_kendaraan LIKE %s OR waktu LIKE %s)"; params.extend([f'%{cari}%', f'%{cari}%'])
     query += " ORDER BY waktu DESC"
     cursor.execute(query, tuple(params))
     data_kendaraan = cursor.fetchall()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return render_template('index.html', data_kendaraan=data_kendaraan, stats={}, halaman='log_semua', tanggal_aktif=tanggal_aktif, cari=cari, arah_aktif=arah_filter)
 
 @app.route('/polisi')
@@ -296,15 +302,14 @@ def polisi():
     arah_filter = request.args.get('arah', 'Semua')
     db = get_db_connection()
     cursor = db.cursor(dictionary=True)
-    query = "SELECT id, waktu, arah, jenis_kendaraan, plat_nomor, kategori, foto_bukti FROM log_kendaraan WHERE kategori = 'Polisi' AND DATE(waktu) = %s"
+    query = "SELECT id, waktu, arah, jenis_kendaraan, kategori, foto_bukti FROM log_kendaraan WHERE (kategori = 'Polisi' OR kategori = 'Dinas') AND DATE(waktu) = %s"
     params = [tanggal_aktif]
     if arah_filter != 'Semua': query += " AND arah = %s"; params.append(arah_filter)
-    if cari: query += " AND (plat_nomor LIKE %s OR jenis_kendaraan LIKE %s OR waktu LIKE %s)"; params.extend([f'%{cari}%', f'%{cari}%', f'%{cari}%'])
+    if cari: query += " AND (jenis_kendaraan LIKE %s OR waktu LIKE %s)"; params.extend([f'%{cari}%', f'%{cari}%'])
     query += " ORDER BY waktu DESC"
     cursor.execute(query, tuple(params))
     data_kendaraan = cursor.fetchall()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return render_template('index.html', data_kendaraan=data_kendaraan, stats={}, halaman='dinas', tanggal_aktif=tanggal_aktif, cari=cari, arah_aktif=arah_filter)
 
 @app.route('/umum')
@@ -315,15 +320,14 @@ def umum():
     arah_filter = request.args.get('arah', 'Semua')
     db = get_db_connection()
     cursor = db.cursor(dictionary=True)
-    query = "SELECT id, waktu, arah, jenis_kendaraan, plat_nomor, kategori, foto_bukti FROM log_kendaraan WHERE kategori = 'Umum' AND DATE(waktu) = %s"
+    query = "SELECT id, waktu, arah, jenis_kendaraan, kategori, foto_bukti FROM log_kendaraan WHERE (kategori = 'Umum' OR kategori = 'Sipil') AND DATE(waktu) = %s"
     params = [tanggal_aktif]
     if arah_filter != 'Semua': query += " AND arah = %s"; params.append(arah_filter)
-    if cari: query += " AND (plat_nomor LIKE %s OR jenis_kendaraan LIKE %s OR waktu LIKE %s)"; params.extend([f'%{cari}%', f'%{cari}%', f'%{cari}%'])
+    if cari: query += " AND (jenis_kendaraan LIKE %s OR waktu LIKE %s)"; params.extend([f'%{cari}%', f'%{cari}%'])
     query += " ORDER BY waktu DESC"
     cursor.execute(query, tuple(params))
     data_kendaraan = cursor.fetchall()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return render_template('index.html', data_kendaraan=data_kendaraan, stats={}, halaman='sipil', tanggal_aktif=tanggal_aktif, cari=cari, arah_aktif=arah_filter)
 
 @app.route('/hapus/<int:id_kendaraan>')
@@ -343,43 +347,58 @@ def hapus_data(id_kendaraan):
             if os.path.exists(path_foto): os.remove(path_foto)
         cursor.execute("DELETE FROM log_kendaraan WHERE id = %s", (id_kendaraan,))
         db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash('Data berhasil dihapus permanen.', 'success')
     return redirect(request.referrer or url_for('index'))
 
 # ==========================================
-# API: SYSTEM HEALTH — FIX NGROK HEADER
+# API: HEARTBEAT (TERIMA DATA LAPTOP)
+# ==========================================
+@app.route('/api/heartbeat', methods=['POST'])
+@csrf.exempt
+def heartbeat():
+    global last_heartbeat
+    try:
+        data = request.json
+        if data:
+            last_heartbeat['cpu'] = data.get('cpu', 0)
+            last_heartbeat['ram'] = data.get('ram', 0)
+            last_heartbeat['time'] = time.time()
+        return {"status": "ok"}, 200
+    except:
+        return {"status": "error"}, 400
+
+# ==========================================
+# API: SYSTEM HEALTH BARU
 # ==========================================
 @app.route('/api/system_health')
 @login_required
 def system_health():
-    cpu_load = psutil.cpu_percent(interval=None)
-    ram_usage = psutil.virtual_memory().percent
-
-    ai_running = False
+    global last_heartbeat
+    
+    # 1. Cek Koneksi DB MySQL
+    db_status = "DISCONNECTED"
     try:
-        cfg = get_config()
-        ngrok_url = cfg.get('ngrok_url', '').strip().rstrip('/')
+        temp_db = get_db_connection()
+        if temp_db.is_connected():
+            db_status = "CONNECTED"
+        temp_db.close()
+    except: pass
 
-        if ngrok_url:
-            # Header wajib untuk bypass Ngrok Free interstitial page
-            headers = {
-                'ngrok-skip-browser-warning': 'true',
-                'User-Agent': 'DigitalGate-HealthCheck/1.0'
-            }
-            url_cek = ngrok_url + '/video_feed'
-            respon = requests.get(url_cek, stream=True, timeout=3, headers=headers)
-            if respon.status_code == 200:
-                ai_running = True
-    except:
-        pass
-
+    # 2. Cek Koneksi AI
+    jeda_waktu = time.time() - last_heartbeat['time']
+    ai_running = jeda_waktu < 15 # Toleransi delay 15 detik
     status_ai = "RUNNING" if ai_running else "OFFLINE"
-    cam1 = "ACTIVE" if ai_running else "OFFLINE"
-    cam2 = "STBY" if ai_running else "OFFLINE"
+    
+    cpu_load = last_heartbeat['cpu'] if ai_running else 0
+    ram_usage = last_heartbeat['ram'] if ai_running else 0
 
-    return {"cpu": cpu_load, "ram": ram_usage, "ai_status": status_ai, "cam1": cam1, "cam2": cam2}
+    return {
+        "cpu": cpu_load, 
+        "ram": ram_usage, 
+        "db_status": db_status, 
+        "ai_status": status_ai
+    }
 
 # ==========================================
 # STATISTIK
@@ -391,7 +410,7 @@ def statistik():
     cursor = db.cursor()
     cursor.execute("""
         SELECT COUNT(*) as total,
-            SUM(CASE WHEN kategori = 'Polisi' THEN 1 ELSE 0 END) as dinas,
+            SUM(CASE WHEN kategori = 'Polisi' OR kategori = 'Dinas' THEN 1 ELSE 0 END) as dinas,
             SUM(CASE WHEN kategori = 'Sipil' OR kategori = 'Umum' THEN 1 ELSE 0 END) as sipil
         FROM log_kendaraan WHERE waktu >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
     """)
@@ -407,8 +426,7 @@ def statistik():
     """)
     row_jam = cursor.fetchone()
     jam_sibuk = row_jam[0] if row_jam else "00:00 - 00:00"
-    dinas_array = [0, 0, 0, 0, 0, 0, 0]
-    sipil_array = [0, 0, 0, 0, 0, 0, 0]
+    dinas_array, sipil_array = [0]*7, [0]*7
     cursor.execute("""
         SELECT WEEKDAY(waktu), kategori, COUNT(*) FROM log_kendaraan
         WHERE waktu >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY WEEKDAY(waktu), kategori
@@ -416,11 +434,10 @@ def statistik():
     for row in cursor.fetchall():
         hari_index, kategori, jumlah = row[0], row[1], row[2]
         if hari_index is not None:
-            if kategori == 'Polisi': dinas_array[hari_index] += jumlah
+            if kategori == 'Polisi' or kategori == 'Dinas': dinas_array[hari_index] += jumlah
             else: sipil_array[hari_index] += jumlah
     data_grafik = json.dumps({'dinas': dinas_array, 'sipil': sipil_array})
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return render_template('statistik.html', stats=stats, jam_sibuk=jam_sibuk, data_grafik=data_grafik, halaman='statistik')
 
 # ==========================================
@@ -432,30 +449,25 @@ def tamu():
     tanggal_aktif = request.args.get('tanggal', datetime.datetime.now().strftime('%Y-%m-%d'))
     db = get_db_connection()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT id, nama_tamu, plat_nomor, instansi, tujuan, no_id_tamu, waktu_datang FROM data_tamu WHERE status = 'AKTIF' ORDER BY waktu_datang DESC")
+    cursor.execute("SELECT id, nama_tamu, instansi, tujuan, no_id_tamu, waktu_datang FROM data_tamu WHERE status = 'AKTIF' ORDER BY waktu_datang DESC")
     tamu_aktif = cursor.fetchall()
-    cursor.execute("SELECT id, nama_tamu, plat_nomor, instansi, tujuan, no_id_tamu, waktu_datang, status FROM data_tamu WHERE status = 'SELESAI' AND DATE(waktu_datang) = %s ORDER BY waktu_datang DESC", (tanggal_aktif,))
+    cursor.execute("SELECT id, nama_tamu, instansi, tujuan, no_id_tamu, waktu_datang, status FROM data_tamu WHERE status = 'SELESAI' AND DATE(waktu_datang) = %s ORDER BY waktu_datang DESC", (tanggal_aktif,))
     tamu_selesai = cursor.fetchall()
-    cursor.execute("SELECT DISTINCT plat_nomor FROM log_kendaraan WHERE arah = 'MASUK' AND DATE(waktu) = %s", (tanggal_aktif,))
-    plat_masuk = cursor.fetchall()
-    cursor.close()
-    db.close()
-    return render_template('tamu.html', tamu_aktif=tamu_aktif, tamu_selesai=tamu_selesai, plat_masuk=plat_masuk, halaman='tamu', tanggal_aktif=tanggal_aktif)
+    cursor.close(); db.close()
+    return render_template('tamu.html', tamu_aktif=tamu_aktif, tamu_selesai=tamu_selesai, halaman='tamu', tanggal_aktif=tanggal_aktif)
 
 @app.route('/tambah_tamu', methods=['POST'])
 @login_required
 def tambah_tamu():
     nama = request.form['nama_tamu']
-    plat = request.form['plat_nomor'].upper()
     instansi = request.form['instansi']
     tujuan = request.form['tujuan']
     no_id = request.form['no_id_tamu']
     db = get_db_connection()
     cursor = db.cursor()
-    cursor.execute("INSERT INTO data_tamu (nama_tamu, plat_nomor, instansi, tujuan, no_id_tamu) VALUES (%s, %s, %s, %s, %s)", (nama, plat, instansi, tujuan, no_id))
+    cursor.execute("INSERT INTO data_tamu (nama_tamu, instansi, tujuan, no_id_tamu) VALUES (%s, %s, %s, %s)", (nama, instansi, tujuan, no_id))
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash('Tamu berhasil diregistrasi!', 'success')
     return redirect(url_for('tamu'))
 
@@ -466,8 +478,7 @@ def selesai_tamu(id_tamu):
     cursor = db.cursor()
     cursor.execute("UPDATE data_tamu SET status = 'SELESAI' WHERE id = %s", (id_tamu,))
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash('Status tamu diubah menjadi selesai/keluar.', 'success')
     return redirect(url_for('tamu'))
 
@@ -479,8 +490,7 @@ def hapus_tamu(id_tamu):
     cursor = db.cursor()
     cursor.execute("DELETE FROM data_tamu WHERE id = %s", (id_tamu,))
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash('Riwayat tamu dihapus secara permanen.', 'success')
     return redirect(url_for('tamu'))
 
@@ -493,8 +503,7 @@ def hapus_tamu_harian():
     cursor = db.cursor()
     cursor.execute("DELETE FROM data_tamu WHERE DATE(waktu_datang) = %s AND status = 'SELESAI'", (tanggal,))
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash(f"Seluruh riwayat tamu (SELESAI) pada tanggal {tanggal} telah dibersihkan.", 'warning')
     return redirect(url_for('tamu', tanggal=tanggal))
 
@@ -510,34 +519,32 @@ def export_data():
     db = get_db_connection()
     if tipe_laporan == 'tamu':
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT waktu_datang, nama_tamu, instansi, plat_nomor, tujuan, no_id_tamu, status FROM data_tamu WHERE DATE(waktu_datang) BETWEEN %s AND %s ORDER BY waktu_datang ASC", (tanggal_awal, tanggal_akhir))
+        cursor.execute("SELECT waktu_datang, nama_tamu, instansi, tujuan, no_id_tamu, status FROM data_tamu WHERE DATE(waktu_datang) BETWEEN %s AND %s ORDER BY waktu_datang ASC", (tanggal_awal, tanggal_akhir))
         data = cursor.fetchall()
-        cursor.close()
-        db.close()
+        cursor.close(); db.close()
         if not data:
             flash(f'Tidak ada catatan tamu dari {tanggal_awal} s.d {tanggal_akhir} untuk diekspor.', 'warning')
             return redirect(request.referrer or url_for('index'))
         df = pd.DataFrame(data)
-        df.columns = ['Waktu', 'Nama Tamu', 'Instansi / Asal', 'Plat Nomor', 'Tujuan', 'No. Badge', 'Status']
+        df.columns = ['Waktu', 'Nama Tamu', 'Instansi / Asal', 'Tujuan', 'No. Badge', 'Status']
         sheet_name = 'Buku_Tamu'
         nama_file = f"Laporan_Tamu_{tanggal_awal}_sd_{tanggal_akhir}.xlsx"
     else:
         kategori_export = request.args.get('kategori_export', 'Semua')
         jenis_export = request.args.get('jenis_export', 'Semua')
         cursor = db.cursor()
-        query = "SELECT waktu, jenis_kendaraan, plat_nomor, kategori FROM log_kendaraan WHERE DATE(waktu) BETWEEN %s AND %s"
+        query = "SELECT waktu, jenis_kendaraan, kategori FROM log_kendaraan WHERE DATE(waktu) BETWEEN %s AND %s"
         params = [tanggal_awal, tanggal_akhir]
         if kategori_export != 'Semua': query += " AND kategori = %s"; params.append(kategori_export)
         if jenis_export != 'Semua': query += " AND jenis_kendaraan = %s"; params.append(jenis_export)
         query += " ORDER BY waktu DESC"
         cursor.execute(query, tuple(params))
         data_kendaraan = cursor.fetchall()
-        cursor.close()
-        db.close()
+        cursor.close(); db.close()
         if not data_kendaraan:
             flash(f'Tidak ada log kendaraan dari {tanggal_awal} s.d {tanggal_akhir} untuk diekspor.', 'warning')
             return redirect(request.referrer or url_for('index'))
-        df = pd.DataFrame(data_kendaraan, columns=['Waktu Terekam', 'Jenis Kendaraan', 'Plat Nomor', 'Kategori'])
+        df = pd.DataFrame(data_kendaraan, columns=['Waktu Terekam', 'Jenis Kendaraan', 'Kategori'])
         sheet_name = 'Log_Kendaraan'
         nama_file = f"Laporan_Mako_{tanggal_awal}_sd_{tanggal_akhir}.xlsx"
     output = io.BytesIO()
@@ -565,15 +572,14 @@ def arsip():
     cek_tabel = cursor.fetchall()
     if cek_tabel:
         try:
-            cursor.execute("SELECT id, waktu, jenis_kendaraan, plat_nomor, kategori FROM arsip_log_kendaraan ORDER BY waktu DESC LIMIT 500")
+            cursor.execute("SELECT id, waktu, jenis_kendaraan, kategori FROM arsip_log_kendaraan ORDER BY waktu DESC LIMIT 500")
             data_arsip = cursor.fetchall()
         except mysql.connector.Error:
             cursor.execute("SELECT * FROM arsip_log_kendaraan ORDER BY waktu DESC LIMIT 500")
             data_arsip = cursor.fetchall()
     else:
         data_arsip = []
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     foto_dir = os.path.join(os.path.dirname(__file__), 'static', 'foto_kendaraan')
     total_foto = len(os.listdir(foto_dir)) if os.path.exists(foto_dir) else 0
     return render_template('arsip.html', halaman='arsip', total_log=total_log, total_foto=total_foto, data_arsip=data_arsip)
@@ -602,11 +608,8 @@ def pindahkan_log():
         msg = f"Berhasil mengarsipkan {row_count} data."
         if hapus_foto: msg += " File foto fisik juga telah dibersihkan."
         flash(msg, 'success')
-    except Exception as e:
-        flash(f"Error: {e}", 'danger')
-    finally:
-        cursor.close()
-        db.close()
+    except Exception as e: flash(f"Error: {e}", 'danger')
+    finally: cursor.close(); db.close()
     return redirect(url_for('arsip'))
 
 @app.route('/arsip/hapus_massal', methods=['POST'])
@@ -619,8 +622,7 @@ def hapus_arsip_massal():
     cursor.execute("DELETE FROM arsip_log_kendaraan WHERE DATE(waktu) BETWEEN %s AND %s", (tgl_awal, tgl_akhir))
     db.commit()
     flash(f"Pemusnahan massal berhasil! {cursor.rowcount} data arsip dihapus permanen.", 'warning')
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return redirect(url_for('arsip'))
 
 @app.route('/arsip/hapus_satuan/<int:id_arsip>')
@@ -631,8 +633,7 @@ def hapus_arsip_satuan(id_arsip):
     cursor = db.cursor()
     cursor.execute("DELETE FROM arsip_log_kendaraan WHERE id = %s", (id_arsip,))
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash('Data arsip berhasil dihapus secara satuan.', 'success')
     return redirect(url_for('arsip'))
 
@@ -644,8 +645,7 @@ def hapus_semua_arsip():
     cursor = db.cursor()
     cursor.execute("TRUNCATE TABLE arsip_log_kendaraan")
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash("SELURUH DATA ARSIP TELAH DIMUSNAHKAN SECARA PERMANEN!", 'danger')
     return redirect(url_for('arsip'))
 
@@ -663,9 +663,7 @@ def clean_foto_manual():
     for nama_file in os.listdir(foto_dir):
         path_file = os.path.join(foto_dir, nama_file)
         if os.path.isfile(path_file) and os.path.getmtime(path_file) < batas_waktu_detik:
-            try:
-                os.remove(path_file)
-                jumlah_dihapus += 1
+            try: os.remove(path_file); jumlah_dihapus += 1
             except: pass
     flash(f"Storage Sweeper Berhasil! {jumlah_dihapus} file foto yang lebih tua dari {hari} hari telah dihapus.", 'success')
     return redirect(url_for('arsip'))
@@ -693,11 +691,9 @@ def backup_full():
             try:
                 cursor.execute(f"SELECT * FROM {tabel}")
                 data = cursor.fetchall()
-                if data:
-                    pd.DataFrame(data).to_excel(writer, index=False, sheet_name=tabel.upper())
+                if data: pd.DataFrame(data).to_excel(writer, index=False, sheet_name=tabel.upper())
             except: pass
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     output.seek(0)
     tgl = datetime.datetime.now().strftime('%Y%m%d_%H%M')
     return send_file(output, download_name=f"BACKUP_DB_MAKO_{tgl}.xlsx", as_attachment=True)
@@ -715,8 +711,7 @@ def users():
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT id, username, nama_lengkap, role, terakhir_login FROM pengguna ORDER BY role ASC")
     daftar_user = cursor.fetchall()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     return render_template('users.html', daftar_user=daftar_user, halaman='users')
 
 @app.route('/tambah_user', methods=['POST'])
@@ -734,11 +729,8 @@ def tambah_user():
         cursor.execute("INSERT INTO pengguna (username, password, nama_lengkap, role) VALUES (%s, %s, %s, %s)", (username, hashed_password, nama_lengkap, role))
         db.commit()
         flash('Personil berhasil didaftarkan dengan sandi terenkripsi.', 'success')
-    except:
-        flash('Gagal! Username sudah ada.', 'danger')
-    finally:
-        cursor.close()
-        db.close()
+    except: flash('Gagal! Username sudah ada.', 'danger')
+    finally: cursor.close(); db.close()
     return redirect(url_for('users'))
 
 @app.route('/hapus_user/<int:id_user>')
@@ -752,13 +744,12 @@ def hapus_user(id_user):
     cursor = db.cursor()
     cursor.execute("DELETE FROM pengguna WHERE id = %s", (id_user,))
     db.commit()
-    cursor.close()
-    db.close()
+    cursor.close(); db.close()
     flash('Akses dicabut.', 'success')
     return redirect(url_for('users'))
 
 # ==========================================
-# PENGATURAN — TAMBAH FIELD NGROK URL
+# PENGATURAN
 # ==========================================
 @app.route('/pengaturan', methods=['GET', 'POST'])
 @login_required
@@ -768,19 +759,14 @@ def pengaturan():
         return redirect(url_for('index'))
 
     config_data = get_config()
-
     if request.method == 'POST':
         rtsp_1 = request.form.get('rtsp_cam1')
         ngrok_url = request.form.get('ngrok_url', '').strip().rstrip('/')
-
-        if rtsp_1 is not None:
-            config_data['rtsp_cam1'] = rtsp_1
+        if rtsp_1 is not None: config_data['rtsp_cam1'] = rtsp_1
         config_data['ngrok_url'] = ngrok_url
-
         save_config(config_data)
         flash('Konfigurasi berhasil disimpan!', 'success')
         return redirect(url_for('pengaturan'))
-
     return render_template('pengaturan.html', halaman='pengaturan', config=config_data)
 
 @app.route('/edit_profil', methods=['POST'])
@@ -801,20 +787,16 @@ def edit_profil():
         session['nama_lengkap'] = nama_lengkap
         session['username'] = username
         flash('Profil berhasil diperbarui!', 'success')
-    except:
-        flash('Gagal! Username mungkin sudah digunakan orang lain.', 'danger')
-    finally:
-        cursor.close()
-        db.close()
+    except: flash('Gagal! Username mungkin sudah digunakan orang lain.', 'danger')
+    finally: cursor.close(); db.close()
     return redirect(request.referrer or url_for('index'))
 
 # ==========================================
-# LIVE STREAM — BACA NGROK URL DARI CONFIG
+# LIVE STREAM
 # ==========================================
 @app.route('/live_stream')
 def live_stream():
-    if 'loggedin' not in session:
-        return redirect(url_for('login'))
+    if 'loggedin' not in session: return redirect(url_for('login'))
     cfg = get_config()
     ngrok_url = cfg.get('ngrok_url', '').strip().rstrip('/')
     return render_template('live_stream.html', halaman='live_stream', ngrok_url=ngrok_url)
@@ -824,21 +806,17 @@ def toggle_theme():
     session['theme'] = 'dark' if session.get('theme') == 'light' else 'light'
     return redirect(request.referrer or url_for('index'))
 
-# ==========================================
-# API: UPLOAD FOTO DARI AI LOKAL
-# ==========================================
 @app.route('/api/upload_foto', methods=['POST'])
 @csrf.exempt
 def upload_foto():
-    if 'foto' not in request.files:
-        return {"status": "gagal", "pesan": "Tidak ada file foto yang dikirim"}, 400
+    if 'foto' not in request.files: return {"status": "gagal", "pesan": "Tidak ada file"}, 400
     file = request.files['foto']
     nama_file = request.form.get('nama_file')
     if file and nama_file:
         foto_dir = os.path.join(os.path.dirname(__file__), 'static', 'foto_kendaraan')
         os.makedirs(foto_dir, exist_ok=True)
         file.save(os.path.join(foto_dir, nama_file))
-        return {"status": "sukses", "pesan": "Foto berhasil diamankan di server!"}, 200
+        return {"status": "sukses", "pesan": "Foto diamankan"}, 200
     return {"status": "gagal", "pesan": "Data tidak lengkap"}, 400
 
 @app.route('/api/get_config')

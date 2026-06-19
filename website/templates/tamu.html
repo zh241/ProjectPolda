@@ -28,7 +28,6 @@
                         <tr>
                             <th class="py-3">WAKTU MASUK</th>
                             <th class="py-3">NAMA / INSTANSI</th>
-                            <th class="py-3">PLAT NOMOR</th>
                             <th class="py-3">NO. BADGE</th>
                             <th class="py-3">AKSI</th>
                         </tr>
@@ -41,7 +40,6 @@
                                 <div class="fw-bold text-dark">{{ baris.nama_tamu }}</div>
                                 <div class="small text-muted">{{ baris.instansi }}</div>
                             </td>
-                            <td><span class="fw-bold font-monospace bg-light border px-2 py-1 rounded text-dark">{{ baris.plat_nomor }}</span></td>
                             <td><span class="badge bg-danger rounded-pill px-3">{{ baris.no_id_tamu }}</span></td>
                             <td>
                                 <a href="{{ url_for('selesai_tamu', id_tamu=baris.id) }}" class="btn btn-sm btn-success fw-bold rounded-pill px-3 shadow-sm" onclick="return confirm('Tandai tamu ini selesai dan keluar dari Mako?');">
@@ -87,7 +85,6 @@
                         <tr>
                             <th class="py-3">WAKTU MASUK</th>
                             <th class="py-3">NAMA TAMU</th>
-                            <th class="py-3">PLAT NOMOR</th>
                             <th class="py-3">TUJUAN</th>
                             <th class="py-3">STATUS</th>
                             {% if session.role == 'Super Admin' %}<th class="py-3 text-danger">AKSI</th>{% endif %}
@@ -98,7 +95,6 @@
                         <tr style="border-bottom: 1px solid rgba(0,0,0,0.03);">
                             <td class="fw-bold text-muted">{{ baris.waktu_datang.strftime('%H:%M:%S') }}</td>
                             <td class="fw-bold text-dark">{{ baris.nama_tamu }}</td>
-                            <td><span class="fw-bold font-monospace bg-light border px-2 py-1 rounded text-muted">{{ baris.plat_nomor }}</span></td>
                             <td class="text-muted">{{ baris.tujuan }}</td>
                             <td><span class="badge bg-secondary rounded-pill px-3"><i class="bi bi-door-closed me-1"></i> Telah Keluar</span></td>
                             
@@ -132,22 +128,14 @@
                         <label class="form-label fw-bold small text-muted">Nama Lengkap (Sesuai KTP)</label>
                         <input type="text" name="nama_tamu" class="form-control fw-bold border-0 shadow-sm" placeholder="Masukkan nama..." required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted">Plat Nomor (Pilih dari Gate Masuk)</label>
-                        <select name="plat_nomor" class="form-select fw-bold border-0 shadow-sm font-monospace">
-                            <option value="-" selected>-- Kendaraan Tidak Terdeteksi / Jalan Kaki --</option>
-                            {% for p in plat_masuk %}
-                            <option value="{{ p.plat_nomor }}">{{ p.plat_nomor }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-muted">Instansi / Asal</label>
-                        <input type="text" name="instansi" class="form-control fw-bold border-0 shadow-sm" placeholder="Contoh: PT. Maju Jaya / Sipil" required>
+                        <input type="text" name="instansi" class="form-control fw-bold border-0 shadow-sm" placeholder="Contoh: PT. Maju Jaya / Masyarakat Sipil" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted">Tujuan Kunjungan</label>
-                        <textarea name="tujuan" class="form-control fw-bold border-0 shadow-sm" rows="2" placeholder="Contoh: Mengurus Berkas..." required></textarea>
+                        <label class="form-label fw-bold small text-muted">Tujuan Kunjungan (Bisa diisi Plat Kendaraan)</label>
+                        <textarea name="tujuan" class="form-control fw-bold border-0 shadow-sm" rows="2" placeholder="Contoh: Mengurus Berkas (Mobil DA 1234 XY)" required></textarea>
                     </div>
                     <div class="mb-2">
                         <label class="form-label fw-bold small text-muted">No. ID Tamu (Badge Fisik)</label>

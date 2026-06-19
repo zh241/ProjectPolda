@@ -28,7 +28,7 @@
                         <i class="bi bi-search text-muted"></i>
                     </span>
                     <input type="text" name="cari" class="form-control border-start-0 fw-bold"
-                        placeholder="Cari Plat, Jenis..."
+                        placeholder="Cari Jenis, Waktu..."
                         value="{{ cari | default('') }}"
                         style="font-size: 0.8rem; height: 35px;">
                 </div>
@@ -43,14 +43,12 @@
                             style="font-size: 0.8rem; height: 35px; cursor: pointer;">
                     </div>
                 </div>
-
                 {% else %}
                 <div class="input-group input-group-sm shadow-sm" style="width: auto;">
                     <span class="input-group-text border-0 bg-light">
                         <i class="bi bi-calendar3 text-secondary"></i>
                     </span>
-                    <input type="date" name="tanggal"
-                        class="form-control fw-bold border-0 bg-light"
+                    <input type="date" name="tanggal" class="form-control fw-bold border-0 bg-light"
                         style="font-size: 0.82rem; height: 36px; cursor: pointer; min-width:130px;"
                         value="{{ tanggal_aktif }}" onchange="this.form.submit()">
                     <span class="input-group-text border-0 bg-light">
@@ -153,21 +151,27 @@
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm p-4 text-white" style="border-radius: 12px; height: 100%; background: #1a1d21;">
                 <h6 class="fw-bold mb-4 small text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.8px; color: rgba(255,255,255,0.5);">
-                    <i class="bi bi-cpu-fill text-danger me-2"></i> System Health (AI Core)
+                    <i class="bi bi-activity text-danger me-2"></i> System Health Monitor
                 </h6>
 
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between mb-2 small fw-bold"><span>AI Inference Load</span><span id="text-cpu" class="text-danger">0% (OFFLINE)</span></div>
-                    <div class="progress" style="height: 6px; background: #2d3136;"><div class="progress-bar bg-danger progress-bar-striped progress-bar-animated progress-bar-ai" style="width: 0%"></div></div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1 small fw-bold"><span><i class="bi bi-cpu text-info me-1"></i> CPU Laptop</span><span id="text-cpu" class="text-info">0%</span></div>
+                    <div class="progress" style="height: 5px; background: #2d3136;"><div id="bar-cpu" class="progress-bar bg-info" style="width: 0%"></div></div>
                 </div>
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between mb-2 small fw-bold"><span>Database Memory</span><span id="text-ram" class="text-secondary">0% (OFFLINE)</span></div>
-                    <div class="progress" style="height: 6px; background: #2d3136;"><div class="progress-bar bg-secondary progress-bar-db" style="width: 0%"></div></div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1 small fw-bold"><span><i class="bi bi-memory text-warning me-1"></i> RAM Laptop</span><span id="text-ram" class="text-warning">0%</span></div>
+                    <div class="progress" style="height: 5px; background: #2d3136;"><div id="bar-ram" class="progress-bar bg-warning" style="width: 0%"></div></div>
                 </div>
-                <div class="mt-auto">
-                    <div id="cam1-box" class="p-3 rounded border border-danger border-opacity-50 text-center" style="background: rgba(220, 53, 69, 0.1);">
-                        <small class="d-block text-danger fw-bold mb-2" style="font-size: 0.75rem; letter-spacing: 1px;">CCTV GATE UTAMA (IN)</small>
-                        <span class="text-white fw-bold" style="font-size: 0.9rem;"><i class="bi bi-x-circle-fill text-danger me-2"></i>OFFLINE</span>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1 small fw-bold"><span><i class="bi bi-database text-primary me-1"></i> Database DB</span><span id="text-db" class="text-secondary">CEKING...</span></div>
+                </div>
+
+                <div class="mt-auto pt-3 border-top border-secondary border-opacity-25">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small fw-bold text-uppercase" style="color: rgba(255,255,255,0.5);">AI Status (Cam 1)</span>
+                        <span id="text-ai" class="fw-bold text-danger" style="font-size: 0.9rem;"><i class="bi bi-x-circle-fill me-1"></i> OFFLINE</span>
                     </div>
                 </div>
             </div>
@@ -183,44 +187,21 @@
             data: {
                 labels: ['06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
                 datasets: [
-                    {
-                        label: 'Kendaraan Dinas',
-                        data: dataParsed.dinas,
-                        backgroundColor: 'rgba(13, 110, 253, 0.75)',
-                        borderRadius: 4,
-                        borderSkipped: false
-                    },
-                    {
-                        label: 'Kendaraan Sipil',
-                        data: dataParsed.sipil,
-                        backgroundColor: 'rgba(173, 181, 189, 0.5)',
-                        borderRadius: 4,
-                        borderSkipped: false
-                    }
+                    { label: 'Kendaraan Dinas', data: dataParsed.dinas, backgroundColor: 'rgba(13, 110, 253, 0.75)', borderRadius: 4 },
+                    { label: 'Kendaraan Sipil', data: dataParsed.sipil, backgroundColor: 'rgba(173, 181, 189, 0.5)', borderRadius: 4 }
                 ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
                 scales: {
-                    y: {
-                        border: { display: false },
-                        grid: { color: 'rgba(0,0,0,0.04)' },
-                        ticks: { font: { size: 11 } },
-                        beginAtZero: true
-                    },
-                    x: {
-                        border: { display: false },
-                        grid: { display: false },
-                        ticks: { font: { size: 11 } }
-                    }
+                    y: { border: { display: false }, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } }, beginAtZero: true },
+                    x: { border: { display: false }, grid: { display: false }, ticks: { font: { size: 11 } } }
                 }
             }
         });
 
+        // UPDATE SYSTEM HEALTH BARU
         function updateSystemHealth() {
             fetch('/api/system_health')
             .then(r => {
@@ -228,33 +209,35 @@
                 return r.json();
             })
             .then(d => {
-                const cB = document.querySelector('.progress-bar-ai'), cT = document.getElementById('text-cpu');
-                const rB = document.querySelector('.progress-bar-db'), rT = document.getElementById('text-ram');
-                const c1 = document.getElementById('cam1-box');
+                const cT = document.getElementById('text-cpu'), cB = document.getElementById('bar-cpu');
+                const rT = document.getElementById('text-ram'), rB = document.getElementById('bar-ram');
+                const dbT = document.getElementById('text-db');
+                const aiT = document.getElementById('text-ai');
                 
-                if(rB && rT) { 
-                    rB.style.width = d.ram+'%'; 
-                    rT.innerText = Math.round(d.ram)+'% (LIVE)'; 
-                    rT.className = 'text-primary'; 
-                    rB.className = 'progress-bar bg-primary'; 
+                if(cT && cB) { cT.innerText = Math.round(d.cpu)+'%'; cB.style.width = d.cpu+'%'; }
+                if(rT && rB) { rT.innerText = Math.round(d.ram)+'%'; rB.style.width = d.ram+'%'; }
+                
+                if(dbT) {
+                    if(d.db_status === 'CONNECTED') {
+                        dbT.innerText = 'CONNECTED'; dbT.className = 'text-primary';
+                    } else {
+                        dbT.innerText = 'DISCONNECTED'; dbT.className = 'text-danger';
+                    }
                 }
                 
-                if(d.ai_status === 'RUNNING') {
-                    if(cB && cT) { let v = Math.round(d.cpu); cB.style.width = v+'%'; cT.innerText = v+'% '+(v > 80 ? '(PANAS)' : '(LIVE)'); cT.className = (v > 80 ? 'text-danger' : 'text-success'); cB.className = 'progress-bar progress-bar-striped progress-bar-animated '+(v > 80 ? 'bg-danger' : 'bg-success'); }
-                    
-                    if(c1) { c1.className = 'p-3 rounded border border-success border-opacity-50 text-center'; c1.style.background = 'rgba(25, 135, 84, 0.15)'; c1.innerHTML = '<small class="d-block text-success fw-bold mb-2" style="font-size: 0.75rem; letter-spacing: 1px;">CCTV GATE UTAMA (IN)</small><span class="text-white fw-bold" style="font-size: 0.9rem;"><i class="bi bi-record-circle-fill text-danger animate-flicker me-2"></i>ACTIVE & RECORDING</span>'; }
-                } else {
-                    if(cB && cT) { cB.style.width = '0%'; cT.innerText = 'OFFLINE'; cT.className = 'text-danger'; cB.className = 'progress-bar bg-danger'; }
-                    if(c1) { c1.className = 'p-3 rounded border border-danger border-opacity-50 text-center'; c1.style.background = 'rgba(220, 53, 69, 0.1)'; c1.innerHTML = '<small class="d-block text-danger fw-bold mb-2" style="font-size: 0.75rem; letter-spacing: 1px;">CCTV GATE UTAMA (IN)</small><span class="text-white fw-bold" style="font-size: 0.9rem;"><i class="bi bi-x-circle-fill text-danger me-2"></i>OFFLINE</span>'; }
+                if(aiT) {
+                    if(d.ai_status === 'RUNNING') {
+                        aiT.innerHTML = '<i class="bi bi-record-circle-fill animate-flicker me-1"></i> RUNNING';
+                        aiT.className = 'fw-bold text-success';
+                    } else {
+                        aiT.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i> OFFLINE';
+                        aiT.className = 'fw-bold text-danger';
+                    }
                 }
             }).catch(e => {
-                const cB = document.querySelector('.progress-bar-ai'), cT = document.getElementById('text-cpu');
-                const rB = document.querySelector('.progress-bar-db'), rT = document.getElementById('text-ram');
-                const c1 = document.getElementById('cam1-box');
-                
-                if(cB && cT) { cB.style.width = '0%'; cT.innerText = 'ERROR'; cT.className = 'text-danger'; cB.className = 'progress-bar bg-danger'; }
-                if(rB && rT) { rB.style.width = '0%'; rT.innerText = 'ERROR'; rT.className = 'text-danger'; rB.className = 'progress-bar bg-danger'; }
-                if(c1) { c1.className = 'p-3 rounded border border-danger border-opacity-50 text-center'; c1.style.background = 'rgba(220, 53, 69, 0.1)'; c1.innerHTML = '<small class="d-block text-danger fw-bold mb-2" style="font-size: 0.75rem; letter-spacing: 1px;">CCTV GATE UTAMA (IN)</small><span class="text-white fw-bold" style="font-size: 0.9rem;"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>CONNECTION ERROR</span>'; }
+                const dbT = document.getElementById('text-db'), aiT = document.getElementById('text-ai');
+                if(dbT) { dbT.innerText = 'ERROR'; dbT.className = 'text-danger'; }
+                if(aiT) { aiT.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i> OFFLINE'; aiT.className = 'fw-bold text-danger'; }
             });
         }
         
@@ -295,7 +278,6 @@
                         <tr>
                             <th class="py-3">Waktu Terekam</th>
                             <th class="py-3">Kendaraan</th>
-                            <th class="py-3">Plat Nomor</th>
                             <th class="py-3">Kategori</th>
                             <th class="py-3">Visual</th>
                             {% if session.role == 'Super Admin' %}<th class="py-3">Aksi</th>{% endif %}
@@ -317,12 +299,11 @@
                                     <span class="fw-bold text-dark small">{{ baris.jenis_kendaraan }}</span>
                                 </div>
                             </td>
-                            <td><span class="fw-bold text-dark font-monospace bg-light border border-secondary border-opacity-25 px-3 py-1 rounded" style="font-size: 1rem; letter-spacing: 1px;">{{ baris.plat_nomor }}</span></td>
                             <td>
-                                {% if baris.kategori == 'Polisi' %}  
-                                    <span class="text-success fw-bold"><i class="bi bi-shield-fill-check me-1"></i> POLISI</span>
+                                {% if baris.kategori == 'Polisi' or baris.kategori == 'Dinas' %}  
+                                    <span class="text-success fw-bold"><i class="bi bi-shield-fill-check me-1"></i> POLISI (DINAS)</span>
                                 {% else %}
-                                    <span class="text-muted fw-bold">SIPIL</span>
+                                    <span class="text-muted fw-bold">SIPIL / UMUM</span>
                                 {% endif %}
                             </td>
                             <td>
