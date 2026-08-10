@@ -1,0 +1,210 @@
+{
+  "info": {
+    "name": "Digital Gate API Tests",
+    "description": "Black Box testing for Digital Gate Flask backend (Railway)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Get Config",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has rtsp_cam1 and ngrok_url\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('rtsp_cam1');",
+              "    pm.expect(jsonData).to.have.property('ngrok_url');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/get_config",
+          "host": ["{{base_url}}"],
+          "path": ["api", "get_config"]
+        }
+      }
+    },
+    {
+      "name": "2. Send Heartbeat",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"cpu\": 25.5, \"ram\": 60.1}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/heartbeat",
+          "host": ["{{base_url}}"],
+          "path": ["api", "heartbeat"]
+        }
+      }
+    },
+    {
+      "name": "3. Get System Health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/system_health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "system_health"]
+        }
+      }
+    },
+    {
+      "name": "4. Fetch CSRF Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var match = pm.response.text().match(/name=\\\"csrf_token\\\"\\s+value=\\\"([^\\\"]+)\\\"/);",
+              "if (match) {",
+              "    pm.collectionVariables.set(\"csrf_token\", match[1]);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/login",
+          "host": ["{{base_url}}"],
+          "path": ["login"]
+        }
+      }
+    },
+    {
+      "name": "5. Login - Wrong Credentials",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Redirected back to login or Failed (200, 302, 400, 401)\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 302, 400, 401]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "csrf_token", "value": "{{csrf_token}}" },
+            { "key": "username", "value": "{{dummy_username}}" },
+            { "key": "password", "value": "{{dummy_password}}" }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/login",
+          "host": ["{{base_url}}"],
+          "path": ["login"]
+        }
+      }
+    },
+    {
+      "name": "6. Login - Rate Limiting (Too Many Requests)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let runCount = pm.environment.get('runCount');",
+              "if (!runCount) runCount = 0;",
+              "pm.environment.set('runCount', parseInt(runCount) + 1);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let runCount = parseInt(pm.environment.get('runCount'));",
+              "if (runCount < 6) {",
+              "    pm.test(\"Status is NOT 429 for request \" + runCount, function () {",
+              "        pm.expect(pm.response.code).to.not.equal(429);",
+              "    });",
+              "    postman.setNextRequest('6. Login - Rate Limiting (Too Many Requests)');",
+              "} else {",
+              "    pm.test(\"Status IS 429 Too Many Requests for request 6\", function () {",
+              "        pm.response.to.have.status(429);",
+              "    });",
+              "    pm.environment.unset('runCount');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "csrf_token", "value": "{{csrf_token}}" },
+            { "key": "username", "value": "admin_bruteforce" },
+            { "key": "password", "value": "wrongpassword" }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/login",
+          "host": ["{{base_url}}"],
+          "path": ["login"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "csrf_token",
+      "value": ""
+    }
+  ]
+}

@@ -1,13 +1,27 @@
-# Credentials
+# Credentials & Local Configs
 website/.env
+website/config.json
 
-# Foto kendaraan
+# Large AI Weight Files
+best.pt
+yolov8s.pt
+
+# Large Executable Binaries (Local Tools)
+ngrok.exe
+cloudflared.exe
+
+# Video & Image Detections (Local Cache)
 website/static/foto_kendaraan/
 
-# Python cache
+# Python Cache
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
+.pytest_cache
 
-# VS Code
+# VS Code & Environment Settings
 .vscode/
+.env
+venv/
+env/

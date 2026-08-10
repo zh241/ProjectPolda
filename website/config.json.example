@@ -1,0 +1,4 @@
+{
+    "rtsp_cam1": "rtsp://admin:your_password@192.168.1.1:554/live",
+    "ngrok_url": "https://your-subdomain.ngrok-free.dev"
+}
