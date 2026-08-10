@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="website/static/logo_tik.png" alt="Logo Bid TIK Polda Kalimantan Selatan" height="90"/> &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="website/static/logo_polda.png" alt="Logo Polda Kalimantan Selatan" height="90"/>
+  <img src="website/static/logo_polda.png" alt="Logo Polda Kalimantan Selatan" height="90"/> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="website/static/logo_tik.png" alt="Logo Bid TIK Polda Kalimantan Selatan" height="90"/>
 
   # 🚗 Digital Gate
   ### Vehicle Monitoring System — AI-Based CCTV Gate Detection
