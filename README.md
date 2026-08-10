@@ -1,5 +1,6 @@
 <div align="center">
-  <img src="website/static/logo_tik.png" alt="Logo Bid TIK Polda Kalimantan Selatan" height="90"/>
+  <img src="website/static/logo_tik.png" alt="Logo Bid TIK Polda Kalimantan Selatan" height="90"/> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="website/static/logo_polda.png" alt="Logo Polda Kalimantan Selatan" height="90"/>
 
   # 🚗 Digital Gate
   ### Vehicle Monitoring System — AI-Based CCTV Gate Detection
@@ -279,7 +280,3 @@ Untuk menjalankan program deteksi di gerbang:
 Proyek ini dirancang dan dikembangkan oleh **Muhammad Zainal Haqi** — Mahasiswa Program Studi Diploma IV Teknologi Rekayasa Komputer Jaringan, **Politeknik Negeri Tanah Laut**, sebagai proyek tugas akhir program Praktik Kerja Lapangan (PKL) pada **Bidang Teknologi Informasi dan Komunikasi (Bid TIK), Kepolisian Daerah Kalimantan Selatan**.
 
 ---
-
-<div align="center">
-  <sub>Lihat juga proyek PKL Polda Kalsel lainnya: <a href="https://github.com/zh241/Siaga-Polda-Kalsel">SIAGA — Sistem Informasi Aktivitas dan Gerak Anggota</a></sub>
-</div>
